@@ -28,6 +28,8 @@ set(SOURCES
     src/Minimap.cpp
     src/Collectible.cpp
     src/Shader.cpp
+    src/TitleScreen.cpp
+    src/HandRenderer.cpp
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES})

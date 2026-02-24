@@ -93,25 +93,50 @@ void Renderer::buildMazeMesh(const Maze& maze) {
             float wz = y * CELL_SIZE;
 
             if (maze.isWall(x, y)) {
-                // Wall cube
+                // Minecraft stone brick walls with color variation
+                unsigned int hash = (unsigned int)(x * 7919 + y * 104729);
+                hash = ((hash >> 16) ^ hash) * 0x45d9f3b;
+                hash = (hash >> 16) ^ hash;
+                float variation = (float)(hash % 100) / 500.0f;
+
+                // Choose between stone brick variants
+                float wr, wg, wb;
+                int variant = hash % 5;
+                if (variant == 0) {
+                    // Mossy stone brick (greenish)
+                    wr = 0.35f + variation; wg = 0.42f + variation; wb = 0.30f + variation;
+                } else if (variant == 1) {
+                    // Cobblestone (lighter gray)
+                    wr = 0.50f + variation; wg = 0.48f + variation; wb = 0.45f + variation;
+                } else {
+                    // Standard stone brick
+                    wr = 0.45f + variation; wg = 0.43f + variation; wb = 0.40f + variation;
+                }
                 addCube(verts, wx, 0.0f, wz, CELL_SIZE, WALL_HEIGHT, CELL_SIZE,
-                        0.45f, 0.40f, 0.35f); // gray-brown walls
+                        wr, wg, wb);
             } else {
+                // Minecraft stone floor
+                unsigned int fhash = (unsigned int)(x * 3571 + y * 7907);
+                fhash = ((fhash >> 16) ^ fhash) * 0x45d9f3b;
+                fhash = (fhash >> 16) ^ fhash;
+                float fvar = (float)(fhash % 100) / 600.0f;
+                float fr = 0.30f + fvar, fg = 0.30f + fvar, fb = 0.32f + fvar;
+
                 // Floor
                 pushQuad(verts,
                     wx,         0.0f, wz,
                     wx+CELL_SIZE, 0.0f, wz,
                     wx+CELL_SIZE, 0.0f, wz+CELL_SIZE,
                     wx,         0.0f, wz+CELL_SIZE,
-                    0.2f, 0.2f, 0.22f, // dark gray floor
+                    fr, fg, fb,
                     0.0f, 1.0f, 0.0f);
-                // Ceiling
+                // Ceiling (dark stone)
                 pushQuad(verts,
                     wx,         WALL_HEIGHT, wz+CELL_SIZE,
                     wx+CELL_SIZE, WALL_HEIGHT, wz+CELL_SIZE,
                     wx+CELL_SIZE, WALL_HEIGHT, wz,
                     wx,         WALL_HEIGHT, wz,
-                    0.05f, 0.05f, 0.1f, // dark blue ceiling
+                    0.12f, 0.12f, 0.15f,
                     0.0f, -1.0f, 0.0f);
             }
         }
@@ -147,10 +172,12 @@ void Renderer::renderMaze(Shader& shader, const glm::mat4& view, const glm::mat4
     shader.setMat4("model", model);
     shader.setMat4("view", view);
     shader.setMat4("projection", projection);
-    shader.setVec3("lightDir", glm::vec3(0.3f, 1.0f, 0.5f));
-    shader.setVec3("fogColor", glm::vec3(0.05f, 0.05f, 0.08f));
-    shader.setFloat("fogDensity", 0.04f);
-    shader.setFloat("fogGradient", 2.5f);
+    // Warmer torch-like lighting direction
+    shader.setVec3("lightDir", glm::vec3(0.2f, 0.8f, 0.4f));
+    // Blue-tinted distance fog (Minecraft-style)
+    shader.setVec3("fogColor", glm::vec3(0.02f, 0.03f, 0.06f));
+    shader.setFloat("fogDensity", 0.035f);
+    shader.setFloat("fogGradient", 2.0f);
 
     glBindVertexArray(mazeVAO);
     glDrawArrays(GL_TRIANGLES, 0, mazeVertexCount);
@@ -179,7 +206,7 @@ void Renderer::buildCubeMesh() {
 void Renderer::buildPyramidMesh() {
     std::vector<float> verts;
     // Base quad
-    float r = 0.6f, g = 0.2f, b = 0.8f; // purple
+    float r = 0.2f, g = 0.8f, b = 0.6f; // Emerald green
     float s = 0.5f, h = 1.0f;
     // 4 triangular faces
     // Front
@@ -212,7 +239,7 @@ void Renderer::buildPyramidMesh() {
 
 void Renderer::buildSphereMesh() {
     std::vector<float> verts;
-    float r = 0.3f, g = 0.8f, b = 1.0f; // cyan-ish
+    float r = 0.6f, g = 0.2f, b = 0.9f; // Ender pearl purple
     int stacks = 8, slices = 12;
     float radius = 0.4f;
 
@@ -273,10 +300,10 @@ void Renderer::renderCollectibles(Shader& shader, const glm::mat4& view,
     shader.use();
     shader.setMat4("view", view);
     shader.setMat4("projection", projection);
-    shader.setVec3("lightDir", glm::vec3(0.3f, 1.0f, 0.5f));
-    shader.setVec3("fogColor", glm::vec3(0.05f, 0.05f, 0.08f));
-    shader.setFloat("fogDensity", 0.04f);
-    shader.setFloat("fogGradient", 2.5f);
+    shader.setVec3("lightDir", glm::vec3(0.2f, 0.8f, 0.4f));
+    shader.setVec3("fogColor", glm::vec3(0.02f, 0.03f, 0.06f));
+    shader.setFloat("fogDensity", 0.035f);
+    shader.setFloat("fogGradient", 2.0f);
 
     for (auto& item : items) {
         if (item.collected) continue;
@@ -314,12 +341,12 @@ void Renderer::renderExitPortal(Shader& shader, const glm::mat4& view,
     shader.use();
     shader.setMat4("view", view);
     shader.setMat4("projection", projection);
-    shader.setVec3("lightDir", glm::vec3(0.3f, 1.0f, 0.5f));
-    shader.setVec3("fogColor", glm::vec3(0.05f, 0.05f, 0.08f));
-    shader.setFloat("fogDensity", 0.04f);
-    shader.setFloat("fogGradient", 2.5f);
+    shader.setVec3("lightDir", glm::vec3(0.2f, 0.8f, 0.4f));
+    shader.setVec3("fogColor", glm::vec3(0.02f, 0.03f, 0.06f));
+    shader.setFloat("fogDensity", 0.035f);
+    shader.setFloat("fogGradient", 2.0f);
 
-    // Pulsing green portal
+    // Nether portal style: purple/magenta pulsing
     float pulse = 0.7f + 0.3f * sin(time * 3.0f);
     glm::mat4 model = glm::translate(glm::mat4(1.0f), exitPos);
     model = glm::rotate(model, time * 1.5f, glm::vec3(0, 1, 0));

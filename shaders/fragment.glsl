@@ -12,14 +12,16 @@ uniform vec3 fogColor;
 
 void main()
 {
-    // Simple directional light
+    // Torch-like warm lighting
     vec3 norm    = normalize(FragNormal);
     vec3 lDir    = normalize(lightDir);
     float diff   = max(dot(norm, lDir), 0.0);
-    float ambient = 0.3;
-    float light  = ambient + diff * 0.7;
+    float ambient = 0.35;
+    float light  = ambient + diff * 0.65;
 
-    vec3 color = FragColor * light;
+    // Warm tint to simulate torch light
+    vec3 warmTint = vec3(1.0, 0.92, 0.82);
+    vec3 color = FragColor * light * warmTint;
 
     // Mix with fog
     color = mix(fogColor, color, Visibility);
