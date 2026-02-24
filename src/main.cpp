@@ -7,7 +7,7 @@
 #include "Maze.h"
 #include "Player.h"
 #include "Renderer.h"
-#include "Minimap.h"
+
 #include "Collectible.h"
 #include "StarRating.h"
 #include "Highscore.h"
@@ -40,8 +40,6 @@ static bool keyW = false, keyA = false, keyS = false, keyD = false;
 static bool keySpace = false;
 static bool requestRestart = false;
 static bool requestWireToggle = false;
-static bool requestMinimapToggle = false;
-static bool requestLegendToggle = false;
 static bool requestTorchToggle = false;
 
 static Difficulty currentDifficulty = Difficulty::MEDIUM;
@@ -355,8 +353,6 @@ static void keyCallback(GLFWwindow* window, int key, int /*scancode*/, int actio
         case GLFW_KEY_SPACE: keySpace = pressed; if (onTitle) keyEnter = pressed; break;
         case GLFW_KEY_R:  if (down) requestRestart = true; break;
         case GLFW_KEY_F1: if (down) requestWireToggle = true; break;
-        case GLFW_KEY_M:  if (down) requestMinimapToggle = true; break;
-        case GLFW_KEY_L:  if (down) requestLegendToggle = true; break;
         case GLFW_KEY_T:  if (down) requestTorchToggle = true; break;
         case GLFW_KEY_ESCAPE:
             if (currentScreen == GameScreen::PLAYING) {
@@ -374,7 +370,6 @@ struct GameState {
     Maze maze;
     Player player;
     Renderer renderer;
-    Minimap minimap;
     Collectible collectibles;
     glm::vec3 exitWorldPos;
     float elapsedTime;
@@ -416,8 +411,6 @@ struct GameState {
 
         auto positions = maze.getItemPositions(cfg.numItems);
         collectibles.placeItems(positions);
-
-        minimap.clearExplored();
 
         elapsedTime = 0.0f;
         won = false;
@@ -470,13 +463,11 @@ int main() {
 
     // Load shaders
     Shader mainShader("shaders/vertex.glsl", "shaders/fragment.glsl");
-    Shader minimapShader("shaders/minimap_vertex.glsl", "shaders/minimap_fragment.glsl");
     Shader hudShader("shaders/hud_vertex.glsl", "shaders/hud_fragment.glsl");
 
     // Initialize game
     GameState game(currentDifficulty);
     game.renderer.init();
-    game.minimap.init();
     game.restart(currentDifficulty);
 
     g_player = &game.player;
@@ -565,14 +556,6 @@ int main() {
             game.renderer.setWireframe(game.wireframe);
             requestWireToggle = false;
         }
-        if (requestMinimapToggle) {
-            game.minimap.toggleVisible();
-            requestMinimapToggle = false;
-        }
-        if (requestLegendToggle) {
-            game.minimap.toggleLegend();
-            requestLegendToggle = false;
-        }
         if (requestTorchToggle) {
             torchLight.toggle();
             requestTorchToggle = false;
@@ -594,23 +577,6 @@ int main() {
         skyRenderer.update(frameTime);
         torchLight.update(frameTime);
         torchLight.setPlayerPosition(game.player.position, game.player.getFront());
-
-        // Update explored cells for minimap
-        {
-            float pgx = game.player.position.x / CELL_SIZE;
-            float pgy = game.player.position.z / CELL_SIZE;
-            int cx = (int)std::floor(pgx);
-            int cy = (int)std::floor(pgy);
-            for (int dy = -3; dy <= 3; dy++) {
-                for (int dx = -3; dx <= 3; dx++) {
-                    int nx = cx + dx;
-                    int ny = cy + dy;
-                    if (nx >= 0 && nx < game.maze.getWidth() &&
-                        ny >= 0 && ny < game.maze.getHeight())
-                        game.minimap.markExplored(nx, ny);
-                }
-            }
-        }
 
         // Try collecting items
         game.collectibles.tryCollect(game.player.position, 1.5f);
@@ -710,14 +676,6 @@ int main() {
             handRenderer.update(frameTime, isMoving, isJumping, isMovingBack);
             handRenderer.render(mainShader, aspect);
         }
-
-        // Minimap (with difficulty and dt for viewport scrolling)
-        game.minimap.render(minimapShader, game.maze,
-                            game.player.position, game.player.yaw,
-                            game.collectibles.getItems(),
-                            game.exitWorldPos,
-                            screenWidth, screenHeight,
-                            (int)currentDifficulty, frameTime);
 
         // HUD text
         {

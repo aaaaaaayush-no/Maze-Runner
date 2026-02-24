@@ -25,7 +25,6 @@ set(SOURCES
     src/Maze.cpp
     src/Player.cpp
     src/Renderer.cpp
-    src/Minimap.cpp
     src/Collectible.cpp
     src/Shader.cpp
     src/TitleScreen.cpp

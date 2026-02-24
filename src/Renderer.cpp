@@ -5,6 +5,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <cmath>
 #include <iostream>
+#include <string>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -12,12 +13,21 @@
 static const float CELL_SIZE = 2.0f;
 static const float WALL_HEIGHT = 4.0f;
 
+// Graffiti texture filenames - add more by dropping files into textures/graffiti/
+const std::vector<std::string> Renderer::GRAFFITI_FILES = {
+    "graffiti_01.png",
+    "graffiti_02.png",
+    "graffiti_03.png",
+    "graffiti_04.png"
+};
+
 Renderer::Renderer()
     : mazeVAO(0), mazeVBO(0), mazeVertexCount(0)
     , cubeVAO(0), cubeVBO(0), cubeVertexCount(0)
     , pyramidVAO(0), pyramidVBO(0), pyramidVertexCount(0)
     , sphereVAO(0), sphereVBO(0), sphereVertexCount(0)
     , wallTextureID(0)
+    , graffitiVAO(0), graffitiVBO(0), graffitiVertexCount(0)
     , wireframe(false)
 {
 }
@@ -28,10 +38,15 @@ Renderer::~Renderer() {
     if (pyramidVAO) { glDeleteVertexArrays(1, &pyramidVAO); glDeleteBuffers(1, &pyramidVBO); }
     if (sphereVAO) { glDeleteVertexArrays(1, &sphereVAO); glDeleteBuffers(1, &sphereVBO); }
     if (wallTextureID) { glDeleteTextures(1, &wallTextureID); }
+    if (graffitiVAO) { glDeleteVertexArrays(1, &graffitiVAO); glDeleteBuffers(1, &graffitiVBO); }
+    for (auto id : graffitiTextureIDs) {
+        if (id) glDeleteTextures(1, &id);
+    }
 }
 
 void Renderer::init() {
     generateWallTexture();
+    generateGraffitiTextures();
     buildCubeMesh();
     buildPyramidMesh();
     buildSphereMesh();
@@ -240,6 +255,9 @@ void Renderer::buildMazeMesh(const Maze& maze) {
     glEnableVertexAttribArray(3);
 
     glBindVertexArray(0);
+
+    // Build graffiti decals on maze walls
+    buildGraffitiMesh(maze);
 }
 
 void Renderer::generateWallTexture() {
@@ -320,7 +338,364 @@ void Renderer::generateWallTexture() {
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-// Helper to set lighting uniforms on shader
+void Renderer::generateGraffitiTextures() {
+    // Try loading external graffiti textures from textures/graffiti/
+    for (const auto& filename : GRAFFITI_FILES) {
+        std::string path = "textures/graffiti/" + filename;
+        int imgW, imgH, imgChannels;
+        unsigned char* data = stbi_load(path.c_str(), &imgW, &imgH, &imgChannels, 4);
+        if (data) {
+            unsigned int texID;
+            glGenTextures(1, &texID);
+            glBindTexture(GL_TEXTURE_2D, texID);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, imgW, imgH, 0,
+                         GL_RGBA, GL_UNSIGNED_BYTE, data);
+            glGenerateMipmap(GL_TEXTURE_2D);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glBindTexture(GL_TEXTURE_2D, 0);
+            graffitiTextureIDs.push_back(texID);
+            stbi_image_free(data);
+            std::cerr << "Loaded graffiti: " << path << "\n";
+        }
+    }
+
+    // If no external textures loaded, generate procedural graffiti
+    if (graffitiTextureIDs.empty()) {
+        std::cerr << "No graffiti files found, generating procedural graffiti\n";
+        const int TEX_SIZE = 64;
+
+        // Procedural graffiti patterns (pixel art style)
+        // Pattern 1: Arrow symbol
+        // Pattern 2: X mark
+        // Pattern 3: Spiral/circle
+        // Pattern 4: Blocky skull
+
+        struct PatternDef {
+            float r, g, b;
+            // Callback to determine if pixel (x,y) is filled
+        };
+
+        // Simple lambda-based pattern definitions
+        auto genTexture = [&](auto patternFunc, float cr, float cg, float cb) {
+            std::vector<unsigned char> pixels(TEX_SIZE * TEX_SIZE * 4, 0);
+            for (int y = 0; y < TEX_SIZE; y++) {
+                for (int x = 0; x < TEX_SIZE; x++) {
+                    int idx = (y * TEX_SIZE + x) * 4;
+                    if (patternFunc(x, y, TEX_SIZE)) {
+                        // Add slight noise for worn look
+                        unsigned int hash = (unsigned int)(x * 7919 + y * 104729);
+                        hash = ((hash >> 16) ^ hash) * 0x45d9f3b;
+                        float noise = (float)(hash % 60) / 255.0f - 0.12f;
+                        pixels[idx + 0] = (unsigned char)(std::max(0.0f, std::min(255.0f, cr * 255.0f + noise * 255.0f)));
+                        pixels[idx + 1] = (unsigned char)(std::max(0.0f, std::min(255.0f, cg * 255.0f + noise * 255.0f)));
+                        pixels[idx + 2] = (unsigned char)(std::max(0.0f, std::min(255.0f, cb * 255.0f + noise * 255.0f)));
+                        pixels[idx + 3] = 220; // mostly opaque
+                    }
+                }
+            }
+            unsigned int texID;
+            glGenTextures(1, &texID);
+            glBindTexture(GL_TEXTURE_2D, texID);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, TEX_SIZE, TEX_SIZE, 0,
+                         GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+            glGenerateMipmap(GL_TEXTURE_2D);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glBindTexture(GL_TEXTURE_2D, 0);
+            graffitiTextureIDs.push_back(texID);
+        };
+
+        // Pattern 1: Arrow pointing right (red)
+        genTexture([](int x, int y, int s) {
+            int cx = s / 2, cy = s / 2;
+            int bx = x / 4, by = y / 4;
+            int bcx = cx / 4, bcy = cy / 4;
+            // Horizontal bar
+            if (by == bcy && bx >= bcx - 4 && bx <= bcx + 2) return true;
+            // Arrow head
+            if (bx >= bcx + 2 && bx <= bcx + 5) {
+                int dist = bx - bcx - 2;
+                if (std::abs(by - bcy) <= (3 - dist) && (3 - dist) >= 0) return true;
+            }
+            return false;
+        }, 0.9f, 0.15f, 0.1f);
+
+        // Pattern 2: X mark (yellow-orange)
+        genTexture([](int x, int y, int s) {
+            int bx = x / 4, by = y / 4;
+            int bs = s / 4;
+            int margin = 2;
+            if (bx >= margin && bx < bs - margin && by >= margin && by < bs - margin) {
+                int lx = bx - margin, ly = by - margin;
+                int range = bs - 2 * margin;
+                // Two diagonals
+                if (std::abs(lx - ly) <= 1) return true;
+                if (std::abs(lx - (range - 1 - ly)) <= 1) return true;
+            }
+            return false;
+        }, 1.0f, 0.7f, 0.1f);
+
+        // Pattern 3: Circle/ring (cyan)
+        genTexture([](int x, int y, int s) {
+            float cx = s / 2.0f, cy = s / 2.0f;
+            float dist = std::sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy));
+            float r = s * 0.35f;
+            float thickness = s * 0.08f;
+            if (dist > r - thickness && dist < r + thickness) return true;
+            return false;
+        }, 0.1f, 0.9f, 0.85f);
+
+        // Pattern 4: Blocky creeper face (green)
+        genTexture([](int x, int y, int s) {
+            int bx = x / 4, by = y / 4;
+            int bs = s / 4;
+            int cx = bs / 2;
+            // Eyes (two 2x2 blocks)
+            if ((bx >= cx - 4 && bx <= cx - 2 && by >= 3 && by <= 5) ||
+                (bx >= cx + 1 && bx <= cx + 3 && by >= 3 && by <= 5))
+                return true;
+            // Nose/mouth area
+            if (bx >= cx - 1 && bx <= cx && by >= 6 && by <= 7)
+                return true;
+            if (bx >= cx - 3 && bx <= cx + 2 && by >= 8 && by <= 9)
+                return true;
+            if ((bx >= cx - 3 && bx <= cx - 2 && by >= 10 && by <= 12) ||
+                (bx >= cx + 1 && bx <= cx + 2 && by >= 10 && by <= 12))
+                return true;
+            return false;
+        }, 0.1f, 0.7f, 0.1f);
+    }
+}
+
+void Renderer::buildGraffitiMesh(const Maze& maze) {
+    if (graffitiTextureIDs.empty()) return;
+
+    // We need separate draw calls per texture, but for simplicity we'll
+    // store per-vertex texture index in color channel and render all graffiti
+    // with the same texture in batches. For this implementation, we batch
+    // all graffiti into one VBO with texture index encoded, then render
+    // in passes per texture.
+
+    // Actually, simpler: store all graffiti quads in one mesh and track
+    // which texture each set of 6 vertices uses. We'll render in passes.
+
+    // Vertex format: pos(3) + normal(3) + texcoord(2) = 8 floats
+    struct GraffitiBatch {
+        std::vector<float> verts;
+    };
+
+    std::vector<GraffitiBatch> batches(graffitiTextureIDs.size());
+
+    int w = maze.getWidth();
+    int h = maze.getHeight();
+
+    // Simple hash-based pseudo-random for deterministic graffiti placement
+    auto hashCell = [](int x, int y, int face) -> unsigned int {
+        unsigned int h = (unsigned int)(x * 73856093 ^ y * 19349663 ^ face * 83492791);
+        h = ((h >> 16) ^ h) * 0x45d9f3b;
+        h = (h >> 16) ^ h;
+        return h;
+    };
+
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+            if (!maze.isWall(x, y)) continue;
+
+            float wx = x * CELL_SIZE;
+            float wz = y * CELL_SIZE;
+
+            // Check each face: only place graffiti on faces adjacent to path cells
+            // Face 0: -Z (back face, adjacent to y-1)
+            // Face 1: +Z (front face, adjacent to y+1)
+            // Face 2: -X (left face, adjacent to x-1)
+            // Face 3: +X (right face, adjacent to x+1)
+
+            struct FaceInfo {
+                int adjX, adjY;      // adjacent cell
+                float nx, ny, nz;    // inward normal (toward path)
+                // Quad corners (bottom-left, bottom-right, top-right, top-left)
+                float x0, y0, z0, x1, y1_, z1, x2, y2, z2, x3, y3, z3;
+            };
+
+            FaceInfo faces[4] = {
+                // -Z face (wall at y-1 side), normal pointing toward -Z path
+                {x, y - 1,  0, 0, -1,
+                 wx + CELL_SIZE, 0.0f, wz,  wx, 0.0f, wz,
+                 wx, WALL_HEIGHT, wz,  wx + CELL_SIZE, WALL_HEIGHT, wz},
+                // +Z face (wall at y+1 side), normal pointing toward +Z path
+                {x, y + 1,  0, 0, 1,
+                 wx, 0.0f, wz + CELL_SIZE,  wx + CELL_SIZE, 0.0f, wz + CELL_SIZE,
+                 wx + CELL_SIZE, WALL_HEIGHT, wz + CELL_SIZE,  wx, WALL_HEIGHT, wz + CELL_SIZE},
+                // -X face (wall at x-1 side), normal pointing toward -X path
+                {x - 1, y,  -1, 0, 0,
+                 wx, 0.0f, wz,  wx, 0.0f, wz + CELL_SIZE,
+                 wx, WALL_HEIGHT, wz + CELL_SIZE,  wx, WALL_HEIGHT, wz},
+                // +X face (wall at x+1 side), normal pointing toward +X path
+                {x + 1, y,  1, 0, 0,
+                 wx + CELL_SIZE, 0.0f, wz + CELL_SIZE,  wx + CELL_SIZE, 0.0f, wz,
+                 wx + CELL_SIZE, WALL_HEIGHT, wz,  wx + CELL_SIZE, WALL_HEIGHT, wz + CELL_SIZE},
+            };
+
+            for (int f = 0; f < 4; f++) {
+                auto& face = faces[f];
+
+                // Check if adjacent cell is a path (not wall and in bounds)
+                if (face.adjX < 0 || face.adjX >= w || face.adjY < 0 || face.adjY >= h)
+                    continue;
+                if (maze.isWall(face.adjX, face.adjY))
+                    continue;
+
+                // Decide if this face gets graffiti
+                unsigned int rh = hashCell(x, y, f);
+                float chance = (float)(rh % 1000) / 1000.0f;
+                if (chance > GRAFFITI_CHANCE) continue;
+
+                // Select graffiti texture
+                int texIdx = (int)(rh / 1000 % graffitiTextureIDs.size());
+
+                // Random scale (0.5x to 1.5x of wall height, clamped to wall)
+                unsigned int rh2 = hashCell(x + 100, y + 200, f + 300);
+                float scale = 0.5f + (float)(rh2 % 100) / 100.0f; // 0.5 to 1.5
+                float grafH = WALL_HEIGHT * scale * 0.5f;
+                float grafW = CELL_SIZE * scale * 0.5f;
+                grafH = std::min(grafH, WALL_HEIGHT * 0.9f);
+                grafW = std::min(grafW, CELL_SIZE * 0.9f);
+
+                // Random position offset within face
+                float maxOffH = (WALL_HEIGHT - grafH) * 0.5f;
+                float maxOffW = (CELL_SIZE - grafW) * 0.5f;
+                float offH = maxOffH * ((float)(rh2 / 100 % 100) / 100.0f * 2.0f - 1.0f) * 0.5f;
+                float offW = maxOffW * ((float)(rh2 / 10000 % 100) / 100.0f * 2.0f - 1.0f) * 0.5f;
+
+                // Center of the wall face
+                float cX = (face.x0 + face.x1 + face.x2 + face.x3) * 0.25f;
+                float cY = WALL_HEIGHT * 0.5f + offH;
+                float cZ = (face.z0 + face.z1 + face.z2 + face.z3) * 0.25f;
+
+                // Offset slightly from wall to avoid z-fighting
+                float offsetDist = 0.01f;
+                float oX = face.nx * offsetDist;
+                float oZ = face.nz * offsetDist;
+
+                // UV rotation: sometimes flip 180
+                bool flipUV = ((rh2 / 1000000) % 2 == 1);
+                float u0 = flipUV ? 1.0f : 0.0f;
+                float u1 = flipUV ? 0.0f : 1.0f;
+                float v0 = 0.0f, v1 = 1.0f;
+
+                // Build the graffiti quad
+                auto& batch = batches[texIdx];
+
+                if (face.nz != 0) {
+                    // Face on Z plane - graffiti extends in X and Y
+                    float hw = grafW * 0.5f;
+                    float hh = grafH * 0.5f;
+                    float px = cX + offW + oX;
+                    float pz = cZ + oZ;
+
+                    // Triangle 1
+                    batch.verts.insert(batch.verts.end(), {px - hw, cY - hh, pz, face.nx, face.ny, face.nz, u0, v0});
+                    batch.verts.insert(batch.verts.end(), {px + hw, cY - hh, pz, face.nx, face.ny, face.nz, u1, v0});
+                    batch.verts.insert(batch.verts.end(), {px + hw, cY + hh, pz, face.nx, face.ny, face.nz, u1, v1});
+                    // Triangle 2
+                    batch.verts.insert(batch.verts.end(), {px - hw, cY - hh, pz, face.nx, face.ny, face.nz, u0, v0});
+                    batch.verts.insert(batch.verts.end(), {px + hw, cY + hh, pz, face.nx, face.ny, face.nz, u1, v1});
+                    batch.verts.insert(batch.verts.end(), {px - hw, cY + hh, pz, face.nx, face.ny, face.nz, u0, v1});
+                } else {
+                    // Face on X plane - graffiti extends in Z and Y
+                    float hw = grafW * 0.5f;
+                    float hh = grafH * 0.5f;
+                    float px = cX + oX;
+                    float pz = cZ + offW + oZ;
+
+                    // Triangle 1
+                    batch.verts.insert(batch.verts.end(), {px, cY - hh, pz - hw, face.nx, face.ny, face.nz, u0, v0});
+                    batch.verts.insert(batch.verts.end(), {px, cY - hh, pz + hw, face.nx, face.ny, face.nz, u1, v0});
+                    batch.verts.insert(batch.verts.end(), {px, cY + hh, pz + hw, face.nx, face.ny, face.nz, u1, v1});
+                    // Triangle 2
+                    batch.verts.insert(batch.verts.end(), {px, cY - hh, pz - hw, face.nx, face.ny, face.nz, u0, v0});
+                    batch.verts.insert(batch.verts.end(), {px, cY + hh, pz + hw, face.nx, face.ny, face.nz, u1, v1});
+                    batch.verts.insert(batch.verts.end(), {px, cY + hh, pz - hw, face.nx, face.ny, face.nz, u0, v1});
+                }
+            }
+        }
+    }
+
+    // Merge all batches into a single VBO with batch offsets
+    // For simplicity, we store graffiti batch info and render in passes
+    // But first, let's use a simpler approach: interleave texture index info
+    // Since OpenGL doesn't support per-vertex texture binding, we render in passes
+
+    // Store batch start/count for rendering
+    std::vector<float> allVerts;
+    // We'll track batch boundaries using graffitiVertexCount as total
+    // and store batch info in a member. For minimal changes, let's just
+    // flatten and use the first texture for all graffiti, OR render per-batch.
+
+    // Actually the cleanest approach: store each batch separately in the VBO
+    // and record offsets. We'll store them sequentially.
+
+    // We need a helper struct. For minimal additions, store counts per batch.
+    // Let's use a simple approach: total verts, render all with same settings.
+
+    // Store batch info as a concatenated buffer with known offsets
+    struct BatchInfo {
+        int startVertex;
+        int vertexCount;
+        int textureIdx;
+    };
+    std::vector<BatchInfo> batchInfos;
+
+    for (size_t i = 0; i < batches.size(); i++) {
+        if (batches[i].verts.empty()) continue;
+        BatchInfo bi;
+        bi.startVertex = (int)(allVerts.size() / 8);
+        bi.vertexCount = (int)(batches[i].verts.size() / 8);
+        bi.textureIdx = (int)i;
+        batchInfos.push_back(bi);
+        allVerts.insert(allVerts.end(), batches[i].verts.begin(), batches[i].verts.end());
+    }
+
+    graffitiVertexCount = (int)(allVerts.size() / 8);
+
+    if (graffitiVertexCount == 0) return;
+
+    if (graffitiVAO) { glDeleteVertexArrays(1, &graffitiVAO); glDeleteBuffers(1, &graffitiVBO); }
+
+    glGenVertexArrays(1, &graffitiVAO);
+    glGenBuffers(1, &graffitiVBO);
+    glBindVertexArray(graffitiVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, graffitiVBO);
+    glBufferData(GL_ARRAY_BUFFER, allVerts.size() * sizeof(float), allVerts.data(), GL_STATIC_DRAW);
+
+    // Stride: 8 floats (pos3 + normal3 + uv2)
+    // Position
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    // Normal (reuse color slot for shading)
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    // TexCoord
+    glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+    glEnableVertexAttribArray(3);
+
+    glBindVertexArray(0);
+
+    // Store batch rendering info
+    graffitiBatchInfos_.clear();
+    for (auto& bi : batchInfos) {
+        GraffitiBatchInfo gbi;
+        gbi.startVertex = bi.startVertex;
+        gbi.vertexCount = bi.vertexCount;
+        gbi.textureIdx = bi.textureIdx;
+        graffitiBatchInfos_.push_back(gbi);
+    }
+}
 static void setLightingUniforms(Shader& shader,
                                 const glm::vec3& sunDir, const glm::vec3& sunColor,
                                 float ambientLevel, const glm::vec3& fogCol,
@@ -362,6 +737,32 @@ void Renderer::renderMaze(Shader& shader, const glm::mat4& view, const glm::mat4
     glBindVertexArray(mazeVAO);
     glDrawArrays(GL_TRIANGLES, 0, mazeVertexCount);
     glBindVertexArray(0);
+
+    // Render graffiti decals
+    if (graffitiVAO && !graffitiBatchInfos_.empty()) {
+        shader.setBool("useTexture", true);
+        shader.setBool("enableEdgeOutline", false);
+        // Set vertex color to white so texture shows through properly
+        // The graffiti VAO has no color attribute, so we set a default
+        glVertexAttrib3f(1, 1.0f, 1.0f, 1.0f);
+
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDepthMask(GL_FALSE); // don't write to depth for decals
+
+        glBindVertexArray(graffitiVAO);
+        for (auto& bi : graffitiBatchInfos_) {
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, graffitiTextureIDs[bi.textureIdx]);
+            shader.setInt("wallTexture", 0);
+            glDrawArrays(GL_TRIANGLES, bi.startVertex, bi.vertexCount);
+        }
+        glBindVertexArray(0);
+
+        glDepthMask(GL_TRUE);
+        glDisable(GL_BLEND);
+        shader.setBool("enableEdgeOutline", true);
+    }
 }
 
 void Renderer::buildCubeMesh() {
