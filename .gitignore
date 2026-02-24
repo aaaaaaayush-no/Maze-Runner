@@ -22,6 +22,9 @@ out/
 *.dll
 *.so
 
+# Runtime data
+highscores.txt
+
 # OS
 .DS_Store
 Thumbs.db

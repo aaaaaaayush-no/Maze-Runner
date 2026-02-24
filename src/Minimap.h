@@ -20,19 +20,28 @@ public:
     bool isVisible() const { return visible; }
     void toggleVisible() { visible = !visible; }
 
+    void toggleLegend() { legendVisible = !legendVisible; }
+    bool isLegendVisible() const { return legendVisible; }
+
     void markExplored(int gx, int gy);
     void clearExplored();
 
+    // dt for smooth viewport lerp
     void render(Shader& shader, const Maze& maze,
                 const glm::vec3& playerPos, float playerYaw,
                 const std::vector<CollectibleItem>& items,
                 const glm::vec3& exitPos,
-                int screenWidth, int screenHeight);
+                int screenWidth, int screenHeight,
+                int difficulty = 1, float dt = 0.016f);
 
 private:
     bool visible;
+    bool legendVisible;
     unsigned int vao, vbo;
     std::set<std::pair<int,int>> explored;
+
+    // Smooth viewport camera position for scrolling
+    float viewCamX, viewCamY;
 
     void pushQuad2D(std::vector<float>& v,
                     float x0, float y0, float x1, float y1,

@@ -9,18 +9,20 @@
 #include "Renderer.h"
 #include "Minimap.h"
 #include "Collectible.h"
+#include "StarRating.h"
+#include "Highscore.h"
 
 #include <iostream>
 #include <string>
 #include <cmath>
 #include <cstdio>
+#include <vector>
+#include <algorithm>
 
 // ── Configuration ──────────────────────────────────────────────────────────
-static const int MAZE_WIDTH  = 21;  // odd numbers for maze gen
-static const int MAZE_HEIGHT = 21;
-static const int NUM_ITEMS   = 7;
 static const float CELL_SIZE = 2.0f;
 static const float FIXED_DT  = 1.0f / 60.0f;
+static const std::string HIGHSCORE_FILE = "highscores.txt";
 
 // ── Globals ────────────────────────────────────────────────────────────────
 static int screenWidth  = 1280;
@@ -35,9 +37,11 @@ static bool keySpace = false;
 static bool requestRestart = false;
 static bool requestWireToggle = false;
 static bool requestMinimapToggle = false;
+static bool requestLegendToggle = false;
+
+static Difficulty currentDifficulty = Difficulty::MEDIUM;
 
 // ── HUD text rendering via bitmap quads ────────────────────────────────────
-// Simple digit/character rendering using quads (no external font needed)
 struct HudRenderer {
     unsigned int vao = 0, vbo = 0;
     Shader* shader = nullptr;
@@ -51,12 +55,9 @@ struct HudRenderer {
         if (vao) { glDeleteVertexArrays(1, &vao); glDeleteBuffers(1, &vbo); }
     }
 
-    // Render a simple rectangle-based character
     void renderChar(std::vector<float>& verts, float x, float y, float w, float h,
                     char c, float r, float g, float b) {
-        // Segment display for digits and some characters
-        // Each segment is a thin rectangle
-        float t = h * 0.12f; // thickness
+        float t = h * 0.12f;
         float hw = w * 0.8f;
         float hh = h * 0.45f;
 
@@ -74,10 +75,7 @@ struct HudRenderer {
         float top = y + 2 * hh;
 
         if (c >= '0' && c <= '9') {
-            //  _
-            // |_|  7-segment style
-            // |_|
-            bool segs[7] = {}; // top, top-left, top-right, mid, bot-left, bot-right, bot
+            bool segs[7] = {};
             switch (c) {
                 case '0': segs[0]=segs[1]=segs[2]=segs[4]=segs[5]=segs[6]=true; break;
                 case '1': segs[2]=segs[5]=true; break;
@@ -90,20 +88,19 @@ struct HudRenderer {
                 case '8': segs[0]=segs[1]=segs[2]=segs[3]=segs[4]=segs[5]=segs[6]=true; break;
                 case '9': segs[0]=segs[1]=segs[2]=segs[3]=segs[5]=segs[6]=true; break;
             }
-            if (segs[0]) hSeg(left, top);           // top
-            if (segs[1]) vSeg(left, mid);            // top-left
-            if (segs[2]) vSeg(right, mid);           // top-right
-            if (segs[3]) hSeg(left, mid);            // middle
-            if (segs[4]) vSeg(left, bot);            // bot-left
-            if (segs[5]) vSeg(right, bot);           // bot-right
-            if (segs[6]) hSeg(left, bot);            // bottom
+            if (segs[0]) hSeg(left, top);
+            if (segs[1]) vSeg(left, mid);
+            if (segs[2]) vSeg(right, mid);
+            if (segs[3]) hSeg(left, mid);
+            if (segs[4]) vSeg(left, bot);
+            if (segs[5]) vSeg(right, bot);
+            if (segs[6]) hSeg(left, bot);
         } else if (c == ':') {
             float dotSize = t * 1.5f;
             float cx = x + hw * 0.4f;
             pushQuad(verts, cx, mid + hh * 0.3f, cx + dotSize, mid + hh * 0.3f + dotSize, r, g, b);
             pushQuad(verts, cx, bot + hh * 0.3f, cx + dotSize, bot + hh * 0.3f + dotSize, r, g, b);
         } else if (c == '/') {
-            // Simple diagonal approximation using small quads
             for (int i = 0; i < 5; i++) {
                 float fx = x + hw * 0.2f + (hw * 0.6f) * i / 5.0f;
                 float fy = bot + (top - bot) * i / 5.0f;
@@ -112,7 +109,6 @@ struct HudRenderer {
         } else if (c == ' ') {
             // nothing
         } else {
-            // For letters, just draw a filled block as fallback
             pushQuad(verts, x, bot, x + hw, top + t, r, g, b);
         }
     }
@@ -130,7 +126,6 @@ struct HudRenderer {
     void renderText(Shader& hudShader, const std::string& text,
                     float x, float y, float charW, float charH,
                     float r, float g, float b, int scrW, int scrH) {
-        // Convert pixel coords to NDC
         std::vector<float> verts;
         float ndcCharW = charW / scrW * 2.0f;
         float ndcCharH = charH / scrH * 2.0f;
@@ -140,6 +135,141 @@ struct HudRenderer {
         for (size_t i = 0; i < text.size(); i++) {
             renderChar(verts, ndcX + i * ndcCharW * 1.2f, ndcY,
                        ndcCharW, ndcCharH, text[i], r, g, b);
+        }
+
+        if (verts.empty()) return;
+
+        hudShader.use();
+        glBindVertexArray(vao);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(float), verts.data(), GL_DYNAMIC_DRAW);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5*sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5*sizeof(float), (void*)(2*sizeof(float)));
+        glEnableVertexAttribArray(1);
+
+        glDisable(GL_DEPTH_TEST);
+        glDrawArrays(GL_TRIANGLES, 0, (int)(verts.size() / 5));
+        glEnable(GL_DEPTH_TEST);
+        glBindVertexArray(0);
+    }
+
+    // Render stars on the win screen (animated)
+    void renderWinStars(Shader& hudShader, int earnedStars, float winElapsed,
+                        std::vector<StarParticle>& particles,
+                        int scrW, int scrH) {
+        std::vector<float> verts;
+
+        // Star positions: centered horizontally, above center
+        float starY = 0.25f; // NDC Y
+        float starSpacing = 0.15f;
+        float startX = -starSpacing; // 3 stars centered
+
+        // Pixel radii converted to NDC
+        float outerR = 30.0f / scrH * 2.0f;
+        float innerR = 13.0f / scrH * 2.0f;
+
+        for (int i = 0; i < 3; i++) {
+            float cx = startX + i * starSpacing;
+            float cy = starY;
+
+            float starAppearTime = 0.4f * i;
+            float timeSinceAppear = winElapsed - starAppearTime;
+
+            if (timeSinceAppear < 0.0f) continue; // not yet visible
+
+            // Scale pop animation: starts at 200%, shrinks to 100% over 0.2s
+            float scale = 1.0f;
+            if (timeSinceAppear < 0.2f) {
+                float t = timeSinceAppear / 0.2f;
+                scale = 2.0f - t; // lerp from 2.0 to 1.0
+            }
+
+            // Spawn particles when star first appears
+            if (timeSinceAppear < 0.017f) { // first frame
+                for (int p = 0; p < 12; p++) {
+                    float angle = p * 2.0f * (float)M_PI / 12.0f;
+                    StarParticle sp;
+                    sp.x = cx;
+                    sp.y = cy;
+                    sp.vx = cos(angle) * 0.3f;
+                    sp.vy = sin(angle) * 0.3f;
+                    sp.life = 0.5f;
+                    sp.maxLife = 0.5f;
+                    particles.push_back(sp);
+                }
+            }
+
+            bool earned = (i < earnedStars);
+
+            if (earned) {
+                // Bright yellow #FFD700
+                generateStarVerts(verts, cx, cy, outerR, innerR,
+                                  1.0f, 0.843f, 0.0f, scale);
+                // White outline
+                generateStarOutline(verts, cx, cy, outerR, innerR,
+                                    1.0f, 1.0f, 1.0f, scale);
+            } else {
+                // Dark gray #444444
+                generateStarVerts(verts, cx, cy, outerR, innerR,
+                                  0.267f, 0.267f, 0.267f, scale);
+                // Dim gray outline
+                generateStarOutline(verts, cx, cy, outerR, innerR,
+                                    0.4f, 0.4f, 0.4f, scale);
+            }
+        }
+
+        // Render particles
+        for (auto& p : particles) {
+            if (p.life <= 0.0f) continue;
+            float alpha = p.life / p.maxLife;
+            float pSize = 0.005f * alpha;
+            pushQuad(verts, p.x - pSize, p.y - pSize, p.x + pSize, p.y + pSize,
+                     1.0f * alpha, 0.843f * alpha, 0.0f);
+        }
+
+        if (verts.empty()) return;
+
+        hudShader.use();
+        glBindVertexArray(vao);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(float), verts.data(), GL_DYNAMIC_DRAW);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5*sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5*sizeof(float), (void*)(2*sizeof(float)));
+        glEnableVertexAttribArray(1);
+
+        glDisable(GL_DEPTH_TEST);
+        glDrawArrays(GL_TRIANGLES, 0, (int)(verts.size() / 5));
+        glEnable(GL_DEPTH_TEST);
+        glBindVertexArray(0);
+    }
+
+    // Render small inline stars for highscore/preview
+    void renderSmallStars(Shader& hudShader, float x, float y, int earned, int total,
+                          int scrW, int scrH) {
+        std::vector<float> verts;
+
+        float outerR = 8.0f / scrH * 2.0f;
+        float innerR = 3.5f / scrH * 2.0f;
+        float spacing = 20.0f / scrW * 2.0f;
+
+        float ndcX = (x / scrW) * 2.0f - 1.0f;
+        float ndcY = (y / scrH) * 2.0f - 1.0f;
+
+        for (int i = 0; i < total; i++) {
+            float cx = ndcX + i * spacing;
+            float cy = ndcY;
+
+            if (i < earned) {
+                // Gold #FFD700
+                generateStarVerts(verts, cx, cy, outerR, innerR,
+                                  1.0f, 0.843f, 0.0f);
+            } else {
+                // Dark gray #444444
+                generateStarVerts(verts, cx, cy, outerR, innerR,
+                                  0.267f, 0.267f, 0.267f);
+            }
         }
 
         if (verts.empty()) return;
@@ -180,7 +310,7 @@ static void mouseCallback(GLFWwindow*, double xposIn, double yposIn) {
     }
 
     float xOff = xpos - lastMouseX;
-    float yOff = lastMouseY - ypos; // reversed: y goes bottom to top
+    float yOff = lastMouseY - ypos;
     lastMouseX = xpos;
     lastMouseY = ypos;
 
@@ -200,6 +330,7 @@ static void keyCallback(GLFWwindow* window, int key, int /*scancode*/, int actio
         case GLFW_KEY_R:  if (down) requestRestart = true; break;
         case GLFW_KEY_F1: if (down) requestWireToggle = true; break;
         case GLFW_KEY_M:  if (down) requestMinimapToggle = true; break;
+        case GLFW_KEY_L:  if (down) requestLegendToggle = true; break;
         case GLFW_KEY_ESCAPE: glfwSetWindowShouldClose(window, true); break;
         default: break;
     }
@@ -216,11 +347,28 @@ struct GameState {
     float elapsedTime;
     bool won;
     bool wireframe;
+    Difficulty difficulty;
 
-    GameState() : maze(MAZE_WIDTH, MAZE_HEIGHT), elapsedTime(0), won(false), wireframe(false) {}
+    // Win screen state
+    float winScreenStartTime;
+    StarResult starResult;
+    std::vector<StarParticle> winParticles;
+    bool scoreSaved;
 
-    void restart() {
-        maze = Maze(MAZE_WIDTH, MAZE_HEIGHT);
+    GameState(Difficulty diff)
+        : maze(getDifficultyConfig(diff).mazeWidth, getDifficultyConfig(diff).mazeHeight),
+          elapsedTime(0), won(false), wireframe(false), difficulty(diff),
+          winScreenStartTime(0), scoreSaved(false)
+    {
+        starResult.stars = 0;
+        starResult.perfectRun = false;
+    }
+
+    void restart(Difficulty diff) {
+        difficulty = diff;
+        auto cfg = getDifficultyConfig(diff);
+
+        maze = Maze(cfg.mazeWidth, cfg.mazeHeight);
         maze.generate();
 
         auto [sx, sy] = maze.getStart();
@@ -233,13 +381,18 @@ struct GameState {
                                  1.0f,
                                  ey * CELL_SIZE + CELL_SIZE * 0.5f);
 
-        auto positions = maze.getItemPositions(NUM_ITEMS);
+        auto positions = maze.getItemPositions(cfg.numItems);
         collectibles.placeItems(positions);
 
         minimap.clearExplored();
 
         elapsedTime = 0.0f;
         won = false;
+        winScreenStartTime = 0.0f;
+        starResult.stars = 0;
+        starResult.perfectRun = false;
+        winParticles.clear();
+        scoreSaved = false;
     }
 };
 
@@ -288,15 +441,18 @@ int main() {
     Shader hudShader("shaders/hud_vertex.glsl", "shaders/hud_fragment.glsl");
 
     // Initialize game
-    GameState game;
+    GameState game(currentDifficulty);
     game.renderer.init();
     game.minimap.init();
-    game.restart();
+    game.restart(currentDifficulty);
 
     g_player = &game.player;
 
     HudRenderer hud;
     hud.init();
+
+    // Load highscores for star preview
+    auto highscores = loadHighscores(HIGHSCORE_FILE);
 
     float accumulator = 0.0f;
     float lastTime = (float)glfwGetTime();
@@ -306,11 +462,12 @@ int main() {
         float currentTime = (float)glfwGetTime();
         float frameTime = currentTime - lastTime;
         lastTime = currentTime;
-        if (frameTime > 0.25f) frameTime = 0.25f; // clamp
+        if (frameTime > 0.25f) frameTime = 0.25f;
 
         // Handle toggle requests
         if (requestRestart) {
-            game.restart();
+            game.restart(currentDifficulty);
+            highscores = loadHighscores(HIGHSCORE_FILE);
             requestRestart = false;
         }
         if (requestWireToggle) {
@@ -321,6 +478,10 @@ int main() {
         if (requestMinimapToggle) {
             game.minimap.toggleVisible();
             requestMinimapToggle = false;
+        }
+        if (requestLegendToggle) {
+            game.minimap.toggleLegend();
+            requestLegendToggle = false;
         }
 
         // Fixed timestep physics
@@ -335,7 +496,7 @@ int main() {
             game.elapsedTime += frameTime;
         }
 
-        // Update explored cells for minimap (mark cells in a radius around player)
+        // Update explored cells for minimap
         {
             float pgx = game.player.position.x / CELL_SIZE;
             float pgy = game.player.position.z / CELL_SIZE;
@@ -360,7 +521,42 @@ int main() {
             float dist = glm::length(game.player.position - game.exitWorldPos);
             if (dist < 2.0f) {
                 game.won = true;
+                game.winScreenStartTime = currentTime;
+
+                // Calculate stars
+                bool allCollected = game.collectibles.allCollected();
+                game.starResult = calculateStars(currentDifficulty,
+                                                 game.elapsedTime, allCollected);
+
+                // Save highscore
+                if (!game.scoreSaved) {
+                    HighscoreEntry entry;
+                    entry.name = "Player";
+                    entry.score = std::max(1, (int)(10000.0f / (game.elapsedTime + 1.0f)));
+                    entry.time = game.elapsedTime;
+                    entry.difficulty = (int)currentDifficulty;
+                    entry.collectables = game.collectibles.getCollectedCount();
+                    entry.stars = game.starResult.stars;
+                    entry.perfectRun = game.starResult.perfectRun ? 1 : 0;
+                    addHighscore(HIGHSCORE_FILE, entry);
+                    highscores = loadHighscores(HIGHSCORE_FILE);
+                    game.scoreSaved = true;
+                }
             }
+        }
+
+        // Update win screen particles
+        if (game.won) {
+            for (auto& p : game.winParticles) {
+                p.x += p.vx * frameTime;
+                p.y += p.vy * frameTime;
+                p.life -= frameTime;
+            }
+            // Remove dead particles
+            game.winParticles.erase(
+                std::remove_if(game.winParticles.begin(), game.winParticles.end(),
+                               [](const StarParticle& p) { return p.life <= 0.0f; }),
+                game.winParticles.end());
         }
 
         // ── Render ─────────────────────────────────────────────────────────
@@ -383,12 +579,13 @@ int main() {
         game.renderer.renderExitPortal(mainShader, view, projection,
                                         game.exitWorldPos, currentTime);
 
-        // Minimap
+        // Minimap (with difficulty and dt for viewport scrolling)
         game.minimap.render(minimapShader, game.maze,
                             game.player.position, game.player.yaw,
                             game.collectibles.getItems(),
                             game.exitWorldPos,
-                            screenWidth, screenHeight);
+                            screenWidth, screenHeight,
+                            (int)currentDifficulty, frameTime);
 
         // HUD text
         {
@@ -412,13 +609,57 @@ int main() {
                            1.0f, 1.0f, 1.0f,
                            screenWidth, screenHeight);
 
+            // Difficulty indicator
+            auto cfg = getDifficultyConfig(currentDifficulty);
+            std::snprintf(buf, sizeof(buf), "%s", cfg.name);
+            hud.renderText(hudShader, buf,
+                           20, (float)screenHeight - 120, 12, 18,
+                           0.6f, 0.6f, 0.8f,
+                           screenWidth, screenHeight);
+
+            // Star preview per difficulty (bottom-left)
+            float previewY = 30.0f;
+            for (int d = 0; d < 4; d++) {
+                int bestStars = getBestStars(highscores, d);
+                float px = 20.0f + d * 80.0f;
+                hud.renderSmallStars(hudShader, px, previewY, bestStars, 3,
+                                     screenWidth, screenHeight);
+            }
+
             // Win screen
             if (game.won) {
-                hud.renderText(hudShader, buf,
+                float winElapsed = currentTime - game.winScreenStartTime;
+
+                // Timer display
+                hud.renderText(hudShader, std::string(buf),
                                (float)screenWidth / 2 - 60,
                                (float)screenHeight / 2,
                                24, 36,
                                0.0f, 1.0f, 0.3f,
+                               screenWidth, screenHeight);
+
+                // Animated stars
+                hud.renderWinStars(hudShader, game.starResult.stars, winElapsed,
+                                   game.winParticles, screenWidth, screenHeight);
+
+                // Perfect run indicator
+                if (game.starResult.perfectRun) {
+                    hud.renderText(hudShader, "999",
+                                   (float)screenWidth / 2 - 30,
+                                   (float)screenHeight / 2 - 60,
+                                   16, 24,
+                                   1.0f, 0.843f, 0.0f,
+                                   screenWidth, screenHeight);
+                }
+
+                // Score
+                int score = std::max(1, (int)(10000.0f / (game.elapsedTime + 1.0f)));
+                std::snprintf(buf, sizeof(buf), "%05d", score);
+                hud.renderText(hudShader, buf,
+                               (float)screenWidth / 2 - 50,
+                               (float)screenHeight / 2 - 100,
+                               20, 30,
+                               1.0f, 1.0f, 1.0f,
                                screenWidth, screenHeight);
             }
         }
