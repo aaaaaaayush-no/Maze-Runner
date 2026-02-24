@@ -11,6 +11,8 @@
 #include "Collectible.h"
 #include "StarRating.h"
 #include "Highscore.h"
+#include "TitleScreen.h"
+#include "HandRenderer.h"
 
 #include <iostream>
 #include <string>
@@ -40,6 +42,12 @@ static bool requestMinimapToggle = false;
 static bool requestLegendToggle = false;
 
 static Difficulty currentDifficulty = Difficulty::MEDIUM;
+static GameScreen currentScreen = GameScreen::TITLE_SCREEN;
+
+// Title screen input
+static bool keyUp = false, keyDown = false;
+static bool keyLeft = false, keyRight = false;
+static bool keyEnter = false;
 
 // ── HUD text rendering via bitmap quads ────────────────────────────────────
 struct HudRenderer {
@@ -300,6 +308,8 @@ static void framebufferSizeCallback(GLFWwindow*, int width, int height) {
 }
 
 static void mouseCallback(GLFWwindow*, double xposIn, double yposIn) {
+    if (currentScreen != GameScreen::PLAYING) return;
+
     float xpos = (float)xposIn;
     float ypos = (float)yposIn;
 
@@ -321,17 +331,36 @@ static void keyCallback(GLFWwindow* window, int key, int /*scancode*/, int actio
     bool pressed = (action == GLFW_PRESS || action == GLFW_REPEAT);
     bool down    = (action == GLFW_PRESS);
 
+    // Navigation keys (work in all screens)
     switch (key) {
-        case GLFW_KEY_W: keyW = pressed; break;
-        case GLFW_KEY_A: keyA = pressed; break;
-        case GLFW_KEY_S: keyS = pressed; break;
-        case GLFW_KEY_D: keyD = pressed; break;
-        case GLFW_KEY_SPACE: keySpace = pressed; break;
+        case GLFW_KEY_UP:    keyUp = pressed; break;
+        case GLFW_KEY_DOWN:  keyDown = pressed; break;
+        case GLFW_KEY_LEFT:  keyLeft = pressed; break;
+        case GLFW_KEY_RIGHT: keyRight = pressed; break;
+        case GLFW_KEY_ENTER: keyEnter = pressed; break;
+        default: break;
+    }
+
+    // WASD doubles as menu navigation on title screen
+    bool onTitle = (currentScreen == GameScreen::TITLE_SCREEN);
+
+    switch (key) {
+        case GLFW_KEY_W: keyW = pressed; if (onTitle) keyUp = pressed; break;
+        case GLFW_KEY_A: keyA = pressed; if (onTitle) keyLeft = pressed; break;
+        case GLFW_KEY_S: keyS = pressed; if (onTitle) keyDown = pressed; break;
+        case GLFW_KEY_D: keyD = pressed; if (onTitle) keyRight = pressed; break;
+        case GLFW_KEY_SPACE: keySpace = pressed; if (onTitle) keyEnter = pressed; break;
         case GLFW_KEY_R:  if (down) requestRestart = true; break;
         case GLFW_KEY_F1: if (down) requestWireToggle = true; break;
         case GLFW_KEY_M:  if (down) requestMinimapToggle = true; break;
         case GLFW_KEY_L:  if (down) requestLegendToggle = true; break;
-        case GLFW_KEY_ESCAPE: glfwSetWindowShouldClose(window, true); break;
+        case GLFW_KEY_ESCAPE:
+            if (currentScreen == GameScreen::PLAYING) {
+                currentScreen = GameScreen::TITLE_SCREEN;
+            } else {
+                glfwSetWindowShouldClose(window, true);
+            }
+            break;
         default: break;
     }
 }
@@ -451,6 +480,12 @@ int main() {
     HudRenderer hud;
     hud.init();
 
+    TitleScreen titleScreen;
+    titleScreen.init();
+
+    HandRenderer handRenderer;
+    handRenderer.init();
+
     // Load highscores for star preview
     auto highscores = loadHighscores(HIGHSCORE_FILE);
 
@@ -463,6 +498,51 @@ int main() {
         float frameTime = currentTime - lastTime;
         lastTime = currentTime;
         if (frameTime > 0.25f) frameTime = 0.25f;
+
+        // ── TITLE SCREEN ──────────────────────────────────────────────────
+        if (currentScreen == GameScreen::TITLE_SCREEN) {
+            // Show cursor on title screen
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+
+            bool startGame = titleScreen.update(frameTime,
+                keyUp || keyW, keyDown || keyS,
+                keyLeft || keyA, keyRight || keyD,
+                keyEnter);
+
+            if (titleScreen.shouldQuit()) {
+                glfwSetWindowShouldClose(window, true);
+                continue;
+            }
+
+            if (startGame) {
+                currentDifficulty = titleScreen.getSelectedDifficulty();
+                game.restart(currentDifficulty);
+                highscores = loadHighscores(HIGHSCORE_FILE);
+                currentScreen = GameScreen::PLAYING;
+                firstMouse = true;
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                continue;
+            }
+
+            // Render title screen
+            glClearColor(0.05f, 0.05f, 0.08f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            // Get best stars for each difficulty
+            std::vector<int> bestStars;
+            for (int d = 0; d < 4; d++) {
+                bestStars.push_back(getBestStars(highscores, d));
+            }
+
+            hudShader.use();
+            titleScreen.render(screenWidth, screenHeight, currentTime, bestStars);
+
+            glfwSwapBuffers(window);
+            glfwPollEvents();
+            continue;
+        }
+
+        // ── PLAYING / WIN SCREEN ──────────────────────────────────────────
 
         // Handle toggle requests
         if (requestRestart) {
@@ -560,7 +640,7 @@ int main() {
         }
 
         // ── Render ─────────────────────────────────────────────────────────
-        glClearColor(0.05f, 0.05f, 0.08f, 1.0f);
+        glClearColor(0.02f, 0.03f, 0.06f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         float aspect = (screenHeight > 0) ? (float)screenWidth / (float)screenHeight : 1.0f;
@@ -578,6 +658,15 @@ int main() {
         // Exit portal
         game.renderer.renderExitPortal(mainShader, view, projection,
                                         game.exitWorldPos, currentTime);
+
+        // Update and render first-person hands
+        {
+            bool isMoving = keyW || keyA || keyS || keyD;
+            bool isJumping = !game.player.isOnGround();
+            bool isMovingBack = keyS && !keyW;
+            handRenderer.update(frameTime, isMoving, isJumping, isMovingBack);
+            handRenderer.render(mainShader, aspect);
+        }
 
         // Minimap (with difficulty and dt for viewport scrolling)
         game.minimap.render(minimapShader, game.maze,
@@ -660,6 +749,12 @@ int main() {
                                20, 30,
                                1.0f, 1.0f, 1.0f,
                                screenWidth, screenHeight);
+
+                // Return to title screen on R press from win screen
+                if (requestRestart) {
+                    currentScreen = GameScreen::TITLE_SCREEN;
+                    requestRestart = false;
+                }
             }
         }
 
@@ -668,6 +763,8 @@ int main() {
     }
 
     hud.cleanup();
+    titleScreen.cleanup();
+    handRenderer.cleanup();
     glfwTerminate();
     return 0;
 }
