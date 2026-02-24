@@ -519,7 +519,7 @@ void Renderer::buildGraffitiMesh(const Maze& maze) {
                 int adjX, adjY;      // adjacent cell
                 float nx, ny, nz;    // inward normal (toward path)
                 // Quad corners (bottom-left, bottom-right, top-right, top-left)
-                float x0, y0, z0, x1, y1_, z1, x2, y2, z2, x3, y3, z3;
+                float x0, py0, z0, x1, py1, z1, x2, py2, z2, x3, py3, z3;
             };
 
             FaceInfo faces[4] = {
@@ -552,8 +552,8 @@ void Renderer::buildGraffitiMesh(const Maze& maze) {
 
                 // Decide if this face gets graffiti
                 unsigned int rh = hashCell(x, y, f);
-                float chance = (float)(rh % 1000) / 1000.0f;
-                if (chance > GRAFFITI_CHANCE) continue;
+                float randomValue = (float)(rh % 1000) / 1000.0f;
+                if (randomValue > GRAFFITI_CHANCE) continue;
 
                 // Select graffiti texture
                 int texIdx = (int)(rh / 1000 % graffitiTextureIDs.size());
