@@ -5,6 +5,7 @@
 #include <fstream>
 #include <sstream>
 
+
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -38,10 +39,10 @@ void main() {
 
 SkyRenderer::SkyRenderer()
     : skyVAO(0), skyVBO(0), sunVAO(0), sunVBO(0)
-    , skyVertexCount(0)
+    , starVAO(0), starVBO(0)
+    , skyVertexCount(0), starVertexCount(0)
     , skyShaderID(0)
-    , timeOfDay(0.3f)  // start at morning
-    , dayLengthSeconds(300.0f)  // 5 minutes for a full day cycle
+    , timeOfDay(0.0f)  // permanent midnight
 {
 }
 
@@ -54,6 +55,8 @@ void SkyRenderer::cleanup() {
     if (skyVBO) { glDeleteBuffers(1, &skyVBO); skyVBO = 0; }
     if (sunVAO) { glDeleteVertexArrays(1, &sunVAO); sunVAO = 0; }
     if (sunVBO) { glDeleteBuffers(1, &sunVBO); sunVBO = 0; }
+    if (starVAO) { glDeleteVertexArrays(1, &starVAO); starVAO = 0; }
+    if (starVBO) { glDeleteBuffers(1, &starVBO); starVBO = 0; }
     if (skyShaderID) { glDeleteProgram(skyShaderID); skyShaderID = 0; }
 }
 
@@ -97,142 +100,44 @@ void SkyRenderer::compileSkyShader() {
 void SkyRenderer::init() {
     compileSkyShader();
     buildSunMesh();
+    buildStarMesh();
 }
 
-void SkyRenderer::update(float dt) {
-    timeOfDay += dt / dayLengthSeconds;
-    if (timeOfDay >= 1.0f) timeOfDay -= 1.0f;
+void SkyRenderer::update(float /*dt*/) {
+    // Permanent night: no time advancement
 }
 
 glm::vec3 SkyRenderer::getSkyTopColor() const {
-    // Time of day: 0.0=midnight, 0.25=sunrise, 0.5=noon, 0.75=sunset
-    float t = timeOfDay;
-
-    // Night: dark blue
-    glm::vec3 nightTop(0.02f, 0.02f, 0.08f);
-    // Dawn: soft purple-blue
-    glm::vec3 dawnTop(0.3f, 0.35f, 0.6f);
-    // Day: bright blue
-    glm::vec3 dayTop(0.25f, 0.5f, 0.85f);
-    // Sunset: deep orange-blue
-    glm::vec3 sunsetTop(0.3f, 0.25f, 0.5f);
-
-    if (t < 0.2f) {
-        // Night
-        return nightTop;
-    } else if (t < 0.3f) {
-        // Night to dawn
-        float f = (t - 0.2f) / 0.1f;
-        return glm::mix(nightTop, dawnTop, f);
-    } else if (t < 0.4f) {
-        // Dawn to day
-        float f = (t - 0.3f) / 0.1f;
-        return glm::mix(dawnTop, dayTop, f);
-    } else if (t < 0.65f) {
-        // Day
-        return dayTop;
-    } else if (t < 0.75f) {
-        // Day to sunset
-        float f = (t - 0.65f) / 0.1f;
-        return glm::mix(dayTop, sunsetTop, f);
-    } else if (t < 0.85f) {
-        // Sunset to night
-        float f = (t - 0.75f) / 0.1f;
-        return glm::mix(sunsetTop, nightTop, f);
-    } else {
-        // Night
-        return nightTop;
-    }
+    // Permanent night sky: deep blue-black
+    return glm::vec3(0.02f, 0.02f, 0.08f);
 }
 
 glm::vec3 SkyRenderer::getSkyHorizonColor() const {
-    float t = timeOfDay;
-
-    glm::vec3 nightHorizon(0.03f, 0.03f, 0.06f);
-    glm::vec3 dawnHorizon(0.8f, 0.5f, 0.3f);
-    glm::vec3 dayHorizon(0.6f, 0.75f, 0.9f);
-    glm::vec3 sunsetHorizon(0.9f, 0.4f, 0.15f);
-
-    if (t < 0.2f) {
-        return nightHorizon;
-    } else if (t < 0.3f) {
-        float f = (t - 0.2f) / 0.1f;
-        return glm::mix(nightHorizon, dawnHorizon, f);
-    } else if (t < 0.4f) {
-        float f = (t - 0.3f) / 0.1f;
-        return glm::mix(dawnHorizon, dayHorizon, f);
-    } else if (t < 0.65f) {
-        return dayHorizon;
-    } else if (t < 0.75f) {
-        float f = (t - 0.65f) / 0.1f;
-        return glm::mix(dayHorizon, sunsetHorizon, f);
-    } else if (t < 0.85f) {
-        float f = (t - 0.75f) / 0.1f;
-        return glm::mix(sunsetHorizon, nightHorizon, f);
-    } else {
-        return nightHorizon;
-    }
+    // Permanent night horizon: very dark blue
+    return glm::vec3(0.03f, 0.03f, 0.06f);
 }
 
 glm::vec3 SkyRenderer::getSunDirection() const {
-    // Sun arc: rises at t=0.25, peaks at t=0.5, sets at t=0.75
-    // Moon arc: rises at t=0.75, peaks at t=0.0, sets at t=0.25
-    float t = timeOfDay;
-
-    // Sun angle (0 at horizon east, PI/2 at zenith, PI at horizon west)
-    float sunAngle;
-    bool isSun = (t >= 0.2f && t <= 0.8f);
-
-    if (isSun) {
-        // Map 0.2-0.8 to 0-PI
-        sunAngle = (t - 0.2f) / 0.6f * (float)M_PI;
-    } else {
-        // Moon
-        float mt = (t >= 0.8f) ? (t - 0.8f) : (t + 0.2f);
-        sunAngle = mt / 0.4f * (float)M_PI;
-    }
-
-    float y = std::sin(sunAngle);
-    float xz = std::cos(sunAngle);
-
+    // Permanent moon at high angle (near zenith)
+    float moonAngle = 0.5f * (float)M_PI; // moon at peak
+    float y = std::sin(moonAngle);
+    float xz = std::cos(moonAngle);
     return glm::normalize(glm::vec3(xz * 0.7f, y, xz * 0.3f));
 }
 
 glm::vec3 SkyRenderer::getSunColor() const {
-    float t = timeOfDay;
-
-    if (t >= 0.25f && t <= 0.75f) {
-        // Daytime: warm yellow
-        // Redder near sunrise/sunset
-        float midDist = std::abs(t - 0.5f) / 0.25f;
-        float warmth = midDist * 0.3f;
-        return glm::vec3(1.0f, 0.9f - warmth * 0.3f, 0.75f - warmth * 0.4f);
-    } else {
-        // Nighttime: pale blue-white moonlight (brighter)
-        return glm::vec3(0.55f, 0.6f, 0.8f);
-    }
+    // Cool blue-white moonlight
+    return glm::vec3(0.55f, 0.6f, 0.8f);
 }
 
 glm::vec3 SkyRenderer::getFogColor() const {
     glm::vec3 horizon = getSkyHorizonColor();
-    // Darken slightly for fog
     return horizon * 0.5f + glm::vec3(0.01f);
 }
 
 float SkyRenderer::getAmbientLevel() const {
-    float t = timeOfDay;
-    // Higher during day, lower at night
-    if (t >= 0.3f && t <= 0.7f) {
-        return 0.4f;
-    } else if (t < 0.2f || t > 0.8f) {
-        return 0.15f;
-    } else if (t < 0.3f) {
-        float f = (t - 0.2f) / 0.1f;
-        return glm::mix(0.15f, 0.4f, f);
-    } else {
-        float f = (t - 0.7f) / 0.1f;
-        return glm::mix(0.4f, 0.15f, f);
-    }
+    // Dim nighttime ambient: 0.15
+    return 0.15f;
 }
 
 void SkyRenderer::buildSunMesh() {
@@ -254,6 +159,72 @@ void SkyRenderer::buildSunMesh() {
     glGenBuffers(1, &sunVBO);
     glBindVertexArray(sunVAO);
     glBindBuffer(GL_ARRAY_BUFFER, sunVBO);
+    glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(float), verts.data(), GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    glBindVertexArray(0);
+}
+
+void SkyRenderer::buildStarMesh() {
+    // Generate random pixel-style stars scattered across the sky dome
+    std::vector<float> verts;
+    const int NUM_STARS = 200;
+    const float radius = 95.0f;
+
+    // Simple pseudo-random star placement using a seed
+    unsigned int seed = 42;
+    auto nextRand = [&seed]() -> float {
+        seed = seed * 1103515245u + 12345u;
+        return (float)((seed >> 16) & 0x7FFF) / 32767.0f;
+    };
+
+    for (int i = 0; i < NUM_STARS; i++) {
+        // Random position on upper hemisphere
+        float theta = nextRand() * 2.0f * (float)M_PI;
+        float phi = nextRand() * (float)M_PI * 0.45f + 0.05f; // above horizon
+
+        float x = radius * std::cos(phi) * std::cos(theta);
+        float y = radius * std::sin(phi);
+        float z = radius * std::cos(phi) * std::sin(theta);
+
+        // Star size: small pixel dots
+        float starSize = 0.15f + nextRand() * 0.25f;
+
+        // Star brightness variation
+        float brightness = 0.6f + nextRand() * 0.4f;
+        float cr = brightness;
+        float cg = brightness;
+        float cb = brightness * (0.95f + nextRand() * 0.05f); // slightly blue tint
+
+        // Billboard quad (two triangles) - always face origin roughly
+        // Use a simple cross pattern for pixel look
+        glm::vec3 pos(x, y, z);
+        glm::vec3 toCenter = glm::normalize(-pos);
+        glm::vec3 up(0.0f, 1.0f, 0.0f);
+        glm::vec3 right = glm::normalize(glm::cross(toCenter, up));
+        glm::vec3 realUp = glm::normalize(glm::cross(right, toCenter));
+
+        glm::vec3 p0 = pos + (-right - realUp) * starSize;
+        glm::vec3 p1 = pos + ( right - realUp) * starSize;
+        glm::vec3 p2 = pos + ( right + realUp) * starSize;
+        glm::vec3 p3 = pos + (-right + realUp) * starSize;
+
+        verts.insert(verts.end(), {p0.x, p0.y, p0.z, cr, cg, cb});
+        verts.insert(verts.end(), {p1.x, p1.y, p1.z, cr, cg, cb});
+        verts.insert(verts.end(), {p2.x, p2.y, p2.z, cr, cg, cb});
+        verts.insert(verts.end(), {p0.x, p0.y, p0.z, cr, cg, cb});
+        verts.insert(verts.end(), {p2.x, p2.y, p2.z, cr, cg, cb});
+        verts.insert(verts.end(), {p3.x, p3.y, p3.z, cr, cg, cb});
+    }
+
+    starVertexCount = (int)(verts.size() / 6);
+
+    glGenVertexArrays(1, &starVAO);
+    glGenBuffers(1, &starVBO);
+    glBindVertexArray(starVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, starVBO);
     glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(float), verts.data(), GL_STATIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
@@ -364,19 +335,16 @@ void SkyRenderer::render(const glm::mat4& view, const glm::mat4& projection) {
     glDisable(GL_CULL_FACE);
     glDrawArrays(GL_TRIANGLES, 0, skyVertexCount);
 
-    // Render sun/moon
+    // Render moon (permanent night)
     {
         glm::vec3 sunDir = getSunDirection();
         glm::vec3 sunPos = sunDir * 80.0f;
         float sunSize = 5.0f;
 
-        // Determine if it's sun or moon
-        bool isSun = (timeOfDay >= 0.2f && timeOfDay <= 0.8f);
-        glm::vec3 bodyColor = isSun ?
-            glm::vec3(1.0f, 0.95f, 0.5f) :  // warm yellow sun
-            glm::vec3(0.8f, 0.85f, 0.95f);   // pale blue-white moon
+        // Moon color: pale blue-white
+        glm::vec3 bodyColor(0.8f, 0.85f, 0.95f);
 
-        // Billboard matrix: sun always faces camera
+        // Billboard matrix: moon always faces camera
         glm::mat4 sunModel = glm::translate(glm::mat4(1.0f), sunPos);
         // Extract rotation from skyView and apply inverse
         glm::mat3 rot = glm::mat3(skyView);
@@ -387,9 +355,8 @@ void SkyRenderer::render(const glm::mat4& view, const glm::mat4& projection) {
         glm::mat4 sunVP = projection * skyView * sunModel;
         glUniformMatrix4fv(vpLoc, 1, GL_FALSE, &sunVP[0][0]);
 
-        // Update sun mesh colors
+        // Build pixelated moon mesh
         std::vector<float> sunVerts;
-        // Blocky shape: render as a square with stepped edges for pixelated look
         float bSize = 0.3f;
         // Center block (3x3 grid of small squares for blocky look)
         for (int bx = -1; bx <= 1; bx++) {
@@ -399,7 +366,7 @@ void SkyRenderer::render(const glm::mat4& view, const glm::mat4& projection) {
                 float cr = bodyColor.r;
                 float cg = bodyColor.g;
                 float cb = bodyColor.b;
-                // Slightly vary corner blocks
+                // Slightly vary corner blocks for pixel texture
                 if (std::abs(bx) + std::abs(by) == 2) {
                     cr *= 0.85f; cg *= 0.85f; cb *= 0.85f;
                 }
@@ -413,7 +380,7 @@ void SkyRenderer::render(const glm::mat4& view, const glm::mat4& projection) {
             }
         }
 
-        // Extra edge blocks for cross/plus shape
+        // Extra edge blocks for rounded pixel moon shape
         float ecr = bodyColor.r * 0.9f;
         float ecg = bodyColor.g * 0.9f;
         float ecb = bodyColor.b * 0.9f;
@@ -451,8 +418,8 @@ void SkyRenderer::render(const glm::mat4& view, const glm::mat4& projection) {
 
         glDrawArrays(GL_TRIANGLES, 0, sunVCount);
 
-        // Render moonlight glow halo around the moon at night
-        if (!isSun) {
+        // Render moonlight glow halo
+        {
             std::vector<float> glowVerts;
             int glowSegments = 16;
             float glowRadius = bSize * 8.0f;
@@ -482,6 +449,13 @@ void SkyRenderer::render(const glm::mat4& view, const glm::mat4& projection) {
 
             glDrawArrays(GL_TRIANGLES, 0, glowVCount);
         }
+    }
+
+    // Render stars
+    if (starVAO && starVertexCount > 0) {
+        glUniformMatrix4fv(vpLoc, 1, GL_FALSE, &viewProj[0][0]);
+        glBindVertexArray(starVAO);
+        glDrawArrays(GL_TRIANGLES, 0, starVertexCount);
     }
 
     glDepthMask(GL_TRUE);

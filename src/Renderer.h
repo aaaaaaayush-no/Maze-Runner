@@ -4,6 +4,7 @@
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <vector>
+#include <string>
 
 class Maze;
 class Shader;
@@ -58,12 +59,31 @@ private:
     // Wall texture
     unsigned int wallTextureID;
 
+    // Graffiti system
+    std::vector<unsigned int> graffitiTextureIDs;
+    unsigned int graffitiVAO, graffitiVBO;
+    int graffitiVertexCount;
+
+    // Batch rendering info for graffiti (rebuilt per buildMazeMesh)
+    struct GraffitiBatchInfo {
+        int startVertex;
+        int vertexCount;
+        int textureIdx;
+    };
+    std::vector<GraffitiBatchInfo> graffitiBatchInfos_;
+
+    // Graffiti config: filenames to load from textures/graffiti/
+    static const std::vector<std::string> GRAFFITI_FILES;
+    static constexpr float GRAFFITI_CHANCE = 0.25f; // 25% chance per eligible wall face
+
     bool wireframe;
 
     void buildCubeMesh();
     void buildPyramidMesh();
     void buildSphereMesh();
     void generateWallTexture();
+    void generateGraffitiTextures();
+    void buildGraffitiMesh(const Maze& maze);
 
     void addCube(std::vector<float>& verts,
                  float x, float y, float z,

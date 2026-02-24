@@ -39,8 +39,12 @@ void main()
     vec3 tint = mix(vec3(0.7, 0.75, 0.9), sunColor, 0.6);
 
     vec3 baseColor = FragColor;
+    float alpha = 1.0;
     if (useTexture) {
-        baseColor = texture(wallTexture, TexCoord).rgb * FragColor;
+        vec4 texSample = texture(wallTexture, TexCoord);
+        baseColor = texSample.rgb * FragColor;
+        alpha = texSample.a;
+        if (alpha < 0.1) discard; // alpha test for graffiti transparency
     }
 
     vec3 color = baseColor * light * tint;
@@ -76,5 +80,5 @@ void main()
     // Mix with fog
     color = mix(fogColor, color, Visibility);
 
-    outColor = vec4(color, 1.0);
+    outColor = vec4(color, alpha);
 }
