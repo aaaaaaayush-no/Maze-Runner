@@ -157,7 +157,7 @@ struct HudRenderer {
     // Render stars on the win screen (animated)
     void renderWinStars(Shader& hudShader, int earnedStars, float winElapsed,
                         std::vector<StarParticle>& particles,
-                        int scrW, int scrH) {
+                        int /*scrW*/, int scrH) {
         std::vector<float> verts;
 
         // Star positions: centered horizontally, above center
@@ -642,14 +642,13 @@ int main() {
                 hud.renderWinStars(hudShader, game.starResult.stars, winElapsed,
                                    game.winParticles, screenWidth, screenHeight);
 
-                // Perfect run indicator
+                // Perfect run indicator (golden star badge)
                 if (game.starResult.perfectRun) {
-                    hud.renderText(hudShader, "999",
-                                   (float)screenWidth / 2 - 30,
-                                   (float)screenHeight / 2 - 60,
-                                   16, 24,
-                                   1.0f, 0.843f, 0.0f,
-                                   screenWidth, screenHeight);
+                    hud.renderSmallStars(hudShader,
+                                         (float)screenWidth / 2,
+                                         (float)screenHeight / 2 + 40,
+                                         1, 1,
+                                         screenWidth, screenHeight);
                 }
 
                 // Score

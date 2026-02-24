@@ -2,6 +2,7 @@
 #include "Maze.h"
 #include "Collectible.h"
 #include "Shader.h"
+#include "StarRating.h"
 #include <cmath>
 #include <algorithm>
 
@@ -86,7 +87,7 @@ void Minimap::render(Shader& shader, const Maze& maze,
     // ── Determine viewport ──────────────────────────────────────────────
     // For HARD (31x31) and NIGHTMARE (41x41): scrolling 15x15 viewport
     // For EASY (15x15) and MEDIUM (21x21): show full maze
-    bool useViewport = (difficulty >= 2); // HARD=2, NIGHTMARE=3
+    bool useViewport = (difficulty >= (int)Difficulty::HARD); // HARD and NIGHTMARE
 
     float playerGridX = playerPos.x / CELL_SIZE;
     float playerGridY = playerPos.z / CELL_SIZE;
@@ -144,7 +145,7 @@ void Minimap::render(Shader& shader, const Maze& maze,
 
             // NIGHTMARE fog: cells fade back if far from player
             float alpha = 1.0f;
-            if (difficulty == 3) { // NIGHTMARE
+            if (difficulty == (int)Difficulty::NIGHTMARE) {
                 float dx = (float)x - playerGridX;
                 float dy = (float)y - playerGridY;
                 float dist = std::sqrt(dx * dx + dy * dy);
@@ -164,7 +165,7 @@ void Minimap::render(Shader& shader, const Maze& maze,
             }
 
             // NIGHTMARE: dark overlay for faded cells
-            if (difficulty == 3 && alpha < 1.0f) {
+            if (difficulty == (int)Difficulty::NIGHTMARE && alpha < 1.0f) {
                 pushQuad2D(verts, cx, cy, cx + cellW, cy + cellH,
                            0.0f, 0.0f, 0.0f); // semi-dark overlay
             }
@@ -326,7 +327,6 @@ void Minimap::render(Shader& shader, const Maze& maze,
         float rowH = legH / 5.0f;
         float iconSize = rowH * 0.5f;
         float iconLeft = legLeft + ndcW * 0.03f;
-        float textLeft = iconLeft + iconSize * 2.5f;
 
         // Row 1: Green dot = Player
         float ry = legTop - rowH * 0.5f;
