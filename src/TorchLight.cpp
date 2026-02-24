@@ -11,7 +11,7 @@ TorchLight::TorchLight()
     : enabled(false)
     , position(0.0f)
     , baseColor(1.0f, 0.7f, 0.3f)  // orange-yellow
-    , radius(20.0f)
+    , radius(30.0f)
     , flickerTimer(0.0f)
     , flickerIntensity(1.0f)
     , glowVAO(0), glowVBO(0), glowVertexCount(0)
