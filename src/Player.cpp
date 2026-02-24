@@ -15,7 +15,7 @@ Player::Player()
     , cameraHeight(1.7f)
     , velocityY(0.0f)
     , gravity(9.8f)
-    , jumpForce(6.5f)
+    , jumpForce(4.5f)
     , onGround(true)
 {
 }

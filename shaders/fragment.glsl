@@ -58,7 +58,7 @@ void main()
             float attenuation = 1.0 / (1.0 + LINEAR_ATTEN * dist + QUADRATIC_ATTEN * dist * dist);
             float falloff = clamp(1.0 - dist / torchRadius, 0.0, 1.0);
             falloff = falloff * falloff; // smooth falloff
-            vec3 torchContrib = torchColor * torchDiff * attenuation * falloff * 1.5;
+            vec3 torchContrib = torchColor * torchDiff * attenuation * falloff * 2.5;
             color += baseColor * torchContrib;
         }
     }

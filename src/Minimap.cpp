@@ -311,51 +311,18 @@ void Minimap::render(Shader& shader, const Maze& maze,
                    1.0f, 1.0f, 1.0f);
     }
 
-    // ── Legend panel (toggled with L) ────────────────────────────────────
-    if (legendVisible) {
-        // Panel below minimap
-        float legTop = ndcBottom - ndcH * 0.02f;
-        float legH = ndcH * 0.35f;
-        float legBottom = legTop - legH;
-        float legLeft = ndcLeft;
-        float legRight = ndcRight;
-
-        // Semi-transparent black background (approximated with dark color)
-        pushQuad2D(verts, legLeft, legBottom, legRight, legTop,
-                   0.0f, 0.0f, 0.0f);
-
-        float rowH = legH / 5.0f;
-        float iconSize = rowH * 0.5f;
-        float iconLeft = legLeft + ndcW * 0.03f;
-
-        // Row 1: Green dot = Player
-        float ry = legTop - rowH * 0.5f;
-        pushQuad2D(verts, iconLeft, ry - iconSize, iconLeft + iconSize * 2, ry + iconSize,
-                   0.0f, 1.0f, 0.0f);
-
-        // Row 2: Blue square = Exit Portal
-        ry -= rowH;
-        pushQuad2D(verts, iconLeft, ry - iconSize, iconLeft + iconSize * 2, ry + iconSize,
-                   0.2f, 0.4f, 1.0f);
-
-        // Row 3: Gray = Wall
-        ry -= rowH;
-        pushQuad2D(verts, iconLeft, ry - iconSize, iconLeft + iconSize * 2, ry + iconSize,
-                   0.4f, 0.35f, 0.3f);
-
-        // Row 4: Light = Corridor
-        ry -= rowH;
-        pushQuad2D(verts, iconLeft, ry - iconSize, iconLeft + iconSize * 2, ry + iconSize,
-                   0.15f, 0.15f, 0.2f);
-
-        // Row 5: Black = Unexplored
-        ry -= rowH;
-        pushQuad2D(verts, iconLeft, ry - iconSize, iconLeft + iconSize * 2, ry + iconSize,
-                   0.05f, 0.05f, 0.05f);
-    }
-
-    // ── Upload and render ───────────────────────────────────────────────
+    // ── Upload and render minimap (circular clip) ─────────────────────────
     shader.use();
+
+    // Set circular minimap clipping uniforms (Free Fire style)
+    float centerX = (ndcLeft + ndcRight) * 0.5f;
+    float centerY = (ndcBottom + ndcTop) * 0.5f;
+    float radiusNDC = ndcW * 0.5f;
+    float aspect = (float)screenWidth / (float)screenHeight;
+    shader.setVec2("mapCenter", glm::vec2(centerX, centerY));
+    shader.setFloat("mapRadius", radiusNDC);
+    shader.setFloat("mapAspect", aspect);
+    shader.setBool("circleClip", true);
 
     glBindVertexArray(vao);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
@@ -368,7 +335,61 @@ void Minimap::render(Shader& shader, const Maze& maze,
 
     glDisable(GL_DEPTH_TEST);
     glDrawArrays(GL_TRIANGLES, 0, (int)(verts.size() / 5));
-    glEnable(GL_DEPTH_TEST);
 
+    // ── Legend panel (toggled with L) - rendered without circle clip ─────
+    if (legendVisible) {
+        std::vector<float> legendVerts;
+
+        // Panel below minimap
+        float legTop = ndcBottom - ndcH * 0.02f;
+        float legH = ndcH * 0.35f;
+        float legBottom = legTop - legH;
+        float legLeft = ndcLeft;
+        float legRight = ndcRight;
+
+        // Semi-transparent black background (approximated with dark color)
+        pushQuad2D(legendVerts, legLeft, legBottom, legRight, legTop,
+                   0.0f, 0.0f, 0.0f);
+
+        float rowH = legH / 5.0f;
+        float iconSize = rowH * 0.5f;
+        float iconLeft = legLeft + ndcW * 0.03f;
+
+        // Row 1: Green dot = Player
+        float ry = legTop - rowH * 0.5f;
+        pushQuad2D(legendVerts, iconLeft, ry - iconSize, iconLeft + iconSize * 2, ry + iconSize,
+                   0.0f, 1.0f, 0.0f);
+
+        // Row 2: Blue square = Exit Portal
+        ry -= rowH;
+        pushQuad2D(legendVerts, iconLeft, ry - iconSize, iconLeft + iconSize * 2, ry + iconSize,
+                   0.2f, 0.4f, 1.0f);
+
+        // Row 3: Gray = Wall
+        ry -= rowH;
+        pushQuad2D(legendVerts, iconLeft, ry - iconSize, iconLeft + iconSize * 2, ry + iconSize,
+                   0.4f, 0.35f, 0.3f);
+
+        // Row 4: Light = Corridor
+        ry -= rowH;
+        pushQuad2D(legendVerts, iconLeft, ry - iconSize, iconLeft + iconSize * 2, ry + iconSize,
+                   0.15f, 0.15f, 0.2f);
+
+        // Row 5: Black = Unexplored
+        ry -= rowH;
+        pushQuad2D(legendVerts, iconLeft, ry - iconSize, iconLeft + iconSize * 2, ry + iconSize,
+                   0.05f, 0.05f, 0.05f);
+
+        shader.setBool("circleClip", false);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glBufferData(GL_ARRAY_BUFFER, legendVerts.size() * sizeof(float), legendVerts.data(), GL_DYNAMIC_DRAW);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(2 * sizeof(float)));
+        glEnableVertexAttribArray(1);
+        glDrawArrays(GL_TRIANGLES, 0, (int)(legendVerts.size() / 5));
+    }
+
+    glEnable(GL_DEPTH_TEST);
     glBindVertexArray(0);
 }
