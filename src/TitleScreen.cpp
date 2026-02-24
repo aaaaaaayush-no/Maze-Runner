@@ -295,14 +295,12 @@ void TitleScreen::drawBackground(std::vector<float>& verts, float time) {
     pushQuad(verts, -1.0f, -1.0f, 1.0f, -0.7f, 0.0f, 0.0f, 0.0f);
 
     // Semi-transparent vignette overlay (darker edges)
-    float vig = 0.03f;
     for (float vy = -1.0f; vy < 1.0f; vy += 0.1f) {
         float distFromCenter = std::abs(vy);
         float alpha = distFromCenter * 0.15f;
         pushQuad(verts, -1.0f, vy, 1.0f, vy + 0.1f,
                  alpha * 0.02f, alpha * 0.01f, alpha * 0.03f);
     }
-    (void)vig;
     (void)time;
 }
 

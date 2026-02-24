@@ -341,13 +341,15 @@ static void keyCallback(GLFWwindow* window, int key, int /*scancode*/, int actio
         default: break;
     }
 
-    // Game controls
+    // WASD doubles as menu navigation on title screen
+    bool onTitle = (currentScreen == GameScreen::TITLE_SCREEN);
+
     switch (key) {
-        case GLFW_KEY_W: keyW = pressed; if (currentScreen == GameScreen::TITLE_SCREEN) keyUp = pressed; break;
-        case GLFW_KEY_A: keyA = pressed; if (currentScreen == GameScreen::TITLE_SCREEN) keyLeft = pressed; break;
-        case GLFW_KEY_S: keyS = pressed; if (currentScreen == GameScreen::TITLE_SCREEN) keyDown = pressed; break;
-        case GLFW_KEY_D: keyD = pressed; if (currentScreen == GameScreen::TITLE_SCREEN) keyRight = pressed; break;
-        case GLFW_KEY_SPACE: keySpace = pressed; if (currentScreen == GameScreen::TITLE_SCREEN) keyEnter = pressed; break;
+        case GLFW_KEY_W: keyW = pressed; if (onTitle) keyUp = pressed; break;
+        case GLFW_KEY_A: keyA = pressed; if (onTitle) keyLeft = pressed; break;
+        case GLFW_KEY_S: keyS = pressed; if (onTitle) keyDown = pressed; break;
+        case GLFW_KEY_D: keyD = pressed; if (onTitle) keyRight = pressed; break;
+        case GLFW_KEY_SPACE: keySpace = pressed; if (onTitle) keyEnter = pressed; break;
         case GLFW_KEY_R:  if (down) requestRestart = true; break;
         case GLFW_KEY_F1: if (down) requestWireToggle = true; break;
         case GLFW_KEY_M:  if (down) requestMinimapToggle = true; break;

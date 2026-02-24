@@ -151,7 +151,7 @@ void HandRenderer::render(Shader& shader, float aspect) {
     shader.use();
 
     // Separate projection for hands (smaller FOV to avoid distortion)
-    glm::mat4 handProj = glm::perspective(glm::radians(70.0f), aspect, 0.01f, 10.0f);
+    glm::mat4 handProj = glm::perspective(glm::radians(70.0f), aspect, 0.05f, 10.0f);
     glm::mat4 handView = glm::mat4(1.0f); // identity - hands are in view space
 
     shader.setMat4("view", handView);
