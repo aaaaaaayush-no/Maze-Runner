@@ -116,8 +116,8 @@ void Maze::addExtraPaths() {
 
     // Shuffle and remove ~15% of these walls
     std::shuffle(candidates.begin(), candidates.end(), rng);
-    int toRemove = std::max(1, (int)(candidates.size() * 15 / 100));
-    for (int i = 0; i < toRemove && i < (int)candidates.size(); i++) {
+    int toRemove = (int)(candidates.size() * 0.15f);
+    for (int i = 0; i < toRemove; i++) {
         grid[candidates[i].wy][candidates[i].wx] = CellType::PATH;
     }
 }
