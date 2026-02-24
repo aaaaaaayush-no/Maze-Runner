@@ -48,8 +48,16 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     ${CMAKE_DL_LIBS}
 )
 
-# Copy shaders to build directory
-file(COPY ${CMAKE_SOURCE_DIR}/shaders DESTINATION ${CMAKE_BINARY_DIR})
+# Copy shaders to build directory (at build time, next to the executable)
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/shaders
+    $<TARGET_FILE_DIR:${PROJECT_NAME}>/shaders
+)
 
-# Copy textures to build directory
-file(COPY ${CMAKE_SOURCE_DIR}/textures DESTINATION ${CMAKE_BINARY_DIR})
+# Copy textures to build directory (at build time, next to the executable)
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/textures
+    $<TARGET_FILE_DIR:${PROJECT_NAME}>/textures
+)
