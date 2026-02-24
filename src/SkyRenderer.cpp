@@ -38,7 +38,7 @@ void main() {
 
 SkyRenderer::SkyRenderer()
     : skyVAO(0), skyVBO(0), sunVAO(0), sunVBO(0)
-    , skyVertexCount(0), sunVertexCount(0)
+    , skyVertexCount(0)
     , skyShaderID(0)
     , timeOfDay(0.3f)  // start at morning
     , dayLengthSeconds(300.0f)  // 5 minutes for a full day cycle
@@ -236,9 +236,9 @@ float SkyRenderer::getAmbientLevel() const {
 }
 
 void SkyRenderer::buildSunMesh() {
-    // Blocky sun/moon: a simple quad
+    // Blocky sun/moon: a simple quad (placeholder, rebuilt dynamically in render)
     std::vector<float> verts;
-    float s = 1.0f; // size, will be scaled in render
+    float s = 1.0f;
 
     // Two triangles for a quad
     // Vertex format: pos(3) + color(3)
@@ -249,8 +249,6 @@ void SkyRenderer::buildSunMesh() {
     verts.insert(verts.end(), {-s, -s, 0.0f, c, c, c});
     verts.insert(verts.end(), { s,  s, 0.0f, c, c, c});
     verts.insert(verts.end(), {-s,  s, 0.0f, c, c, c});
-
-    sunVertexCount = 6;
 
     glGenVertexArrays(1, &sunVAO);
     glGenBuffers(1, &sunVBO);
@@ -391,7 +389,6 @@ void SkyRenderer::render(const glm::mat4& view, const glm::mat4& projection) {
 
         // Update sun mesh colors
         std::vector<float> sunVerts;
-        float s = 1.0f;
         // Blocky shape: render as a square with stepped edges for pixelated look
         float bSize = 0.3f;
         // Center block (3x3 grid of small squares for blocky look)

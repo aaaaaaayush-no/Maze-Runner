@@ -40,7 +40,6 @@ private:
     unsigned int skyVAO, skyVBO;
     unsigned int sunVAO, sunVBO;
     int skyVertexCount;
-    int sunVertexCount;
 
     unsigned int skyShaderID;
 
@@ -48,7 +47,6 @@ private:
     float dayLengthSeconds;  // real seconds for one full day
 
     void compileSkyShader();
-    void buildSkyMesh();
     void buildSunMesh();
 
     glm::vec3 getSkyTopColor() const;

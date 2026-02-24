@@ -53,7 +53,9 @@ void main()
             vec3 torchDir = normalize(toTorch);
             float torchDiff = max(dot(norm, torchDir), 0.0);
             // Radial falloff (quadratic attenuation)
-            float attenuation = 1.0 / (1.0 + 0.15 * dist + 0.08 * dist * dist);
+            const float LINEAR_ATTEN = 0.15;
+            const float QUADRATIC_ATTEN = 0.08;
+            float attenuation = 1.0 / (1.0 + LINEAR_ATTEN * dist + QUADRATIC_ATTEN * dist * dist);
             float falloff = clamp(1.0 - dist / torchRadius, 0.0, 1.0);
             falloff = falloff * falloff; // smooth falloff
             vec3 torchContrib = torchColor * torchDiff * attenuation * falloff * 1.5;
@@ -64,10 +66,10 @@ void main()
     // Edge outline effect for blocky aesthetic
     if (enableEdgeOutline) {
         // Detect edges using texture coordinate proximity to 0/1 boundaries
-        float edgeWidth = 0.02;
+        const float EDGE_WIDTH = 0.02;
         float edgeX = min(TexCoord.x, 1.0 - TexCoord.x);
         float edgeY = min(TexCoord.y, 1.0 - TexCoord.y);
-        float edgeFactor = smoothstep(0.0, edgeWidth, min(edgeX, edgeY));
+        float edgeFactor = smoothstep(0.0, EDGE_WIDTH, min(edgeX, edgeY));
         color *= mix(0.6, 1.0, edgeFactor);
     }
 

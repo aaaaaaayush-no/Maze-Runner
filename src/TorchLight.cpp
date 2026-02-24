@@ -64,7 +64,7 @@ void TorchLight::buildGlowMesh() {
     float s = 0.15f;
 
     // Vertex format: pos(3) + color(3) + normal(3) for compatibility with main shader
-    float r = 1.0f, g = 0.8f, b = 0.3f;
+    float r = baseColor.r, g = baseColor.g, b = baseColor.b;
 
     // Two triangles forming a diamond
     verts.insert(verts.end(), { 0, s, 0, r, g, b, 0, 0, 1});
