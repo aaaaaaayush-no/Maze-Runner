@@ -43,11 +43,15 @@ private:
     unsigned int sphereVAO, sphereVBO;
     int sphereVertexCount;
 
+    // Wall texture
+    unsigned int wallTextureID;
+
     bool wireframe;
 
     void buildCubeMesh();
     void buildPyramidMesh();
     void buildSphereMesh();
+    void generateWallTexture();
 
     void addCube(std::vector<float>& verts,
                  float x, float y, float z,
