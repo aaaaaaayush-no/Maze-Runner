@@ -8,7 +8,7 @@ A 3D first-person maze exploration game built with OpenGL 3.3, featuring procedu
 
 - **Procedural Maze Generation** – Recursive backtracking algorithm creates a unique maze every game
 - **Difficulty Levels** – EASY (15×15), MEDIUM (21×21), HARD (31×31) and NIGHTMARE (41×41) with scaled item counts and time thresholds
-- **First-Person 3D Rendering** – Flat-shaded geometry with fog for depth perception, wireframe toggle
+- **First-Person 3D Rendering** – Textured geometry with procedural stone-brick wall textures, warm torch lighting, exponential fog, wireframe toggle
 - **Physics** – Gravity (9.8 m/s²) and jump mechanics with AABB wall collision
 - **Minimap** – North-up top-right overlay with fog-of-war, compass rose, player arrow, item markers and exit indicator (toggle with M); scrolling viewport for larger mazes; legend panel (toggle with L)
 - **Collectible Items** – Keys (golden cubes), Artifacts (rotating pyramids) and Orbs (spheres) placed at dead ends
@@ -90,23 +90,25 @@ cd build
 │   ├── glad/          # GLAD OpenGL loader (bundled)
 │   └── KHR/           # Khronos platform header
 ├── shaders/
-│   ├── vertex.glsl            # 3D scene vertex shader (MVP + fog)
-│   ├── fragment.glsl          # 3D scene fragment shader (lighting + fog)
+│   ├── vertex.glsl            # 3D scene vertex shader (MVP + fog + UV)
+│   ├── fragment.glsl          # 3D scene fragment shader (lighting + fog + texture sampling)
 │   ├── minimap_vertex.glsl    # 2D overlay vertex shader
 │   ├── minimap_fragment.glsl  # 2D overlay fragment shader
 │   ├── hud_vertex.glsl        # HUD vertex shader
 │   └── hud_fragment.glsl      # HUD fragment shader
 └── src/
-    ├── main.cpp         # Game loop, input, HUD, win logic
-    ├── Maze.h/cpp       # Procedural maze generation & storage
-    ├── Player.h/cpp     # First-person camera, movement, physics
-    ├── Renderer.h/cpp   # OpenGL rendering pipeline
-    ├── Minimap.h/cpp    # 2D minimap overlay with fog of war
-    ├── Collectible.h/cpp# Item placement & collection
-    ├── Shader.h/cpp     # GLSL shader loading & uniform helpers
-    ├── StarRating.h     # Difficulty config, star calculation & rendering
-    ├── Highscore.h      # CSV highscore load/save with backward compat
-    └── glad.c           # GLAD implementation
+    ├── main.cpp           # Game loop, input, HUD, win logic
+    ├── Maze.h/cpp         # Procedural maze generation & storage
+    ├── Player.h/cpp       # First-person camera, movement, physics
+    ├── Renderer.h/cpp     # OpenGL rendering pipeline & procedural textures
+    ├── Minimap.h/cpp      # 2D minimap overlay with fog of war
+    ├── Collectible.h/cpp  # Item placement & collection
+    ├── Shader.h/cpp       # GLSL shader loading & uniform helpers
+    ├── TitleScreen.h/cpp  # Animated title screen & difficulty selection menu
+    ├── HandRenderer.h/cpp # First-person hand with walk/jump animation
+    ├── StarRating.h       # Difficulty config, star calculation & rendering
+    ├── Highscore.h        # CSV highscore load/save with backward compat
+    └── glad.c             # GLAD implementation
 ```
 
 ## Technical Details
@@ -115,13 +117,64 @@ cd build
 |-----------|---------------|
 | Maze algorithm | Recursive backtracking on an odd-dimensioned grid |
 | Difficulty | 4 tiers (EASY–NIGHTMARE) scaling maze size, items and time thresholds |
-| Rendering | VBO/VAO with per-vertex position + color + normal (stride 9 floats) |
-| Shading | Directional light (Gouraud) + exponential fog |
+| Rendering | VBO/VAO with per-vertex position + color + normal + texcoord (stride 11 floats for maze, 9 for objects) |
+| Textures | Procedural 128×128 stone-brick texture generated at init; `useTexture` uniform toggles sampling in fragment shader |
+| Shading | Directional light (Gouraud) + exponential fog + warm torch tint |
 | Collision | AABB with separate X/Z axis resolution |
 | Physics | Fixed 60 Hz timestep, gravity 9.8 m/s², jump impulse 6.5 m/s |
 | Minimap | North-up dynamic quads in NDC, scrolling viewport, fog-of-war via explored cell set |
 | Star rating | Time-based 1–3 stars, animated win screen with particle bursts |
 | Highscores | CSV persistence, top 10, backward-compatible 5→7 column format |
+
+## Textures
+
+Wall and floor surfaces use a **procedurally generated** stone-brick texture created
+at runtime in `Renderer::generateWallTexture()`. No external image files are needed.
+
+### How it works
+
+1. A 128×128 RGB pixel buffer is filled with a brick pattern (4 rows, offset every
+   other row) including mortar lines, per-brick colour variation and per-pixel noise.
+2. The buffer is uploaded to an OpenGL texture with mipmaps (`GL_LINEAR_MIPMAP_LINEAR`).
+3. The maze mesh is built with an 11-float vertex stride
+   (`pos[3] + color[3] + normal[3] + texcoord[2]`) so every face carries UV
+   coordinates.
+4. In the fragment shader, the `useTexture` boolean uniform controls whether the
+   `wallTexture` sampler modulates the base vertex colour. Collectibles and the
+   exit portal set `useTexture = false` and use vertex colour only.
+
+### Customising the texture
+
+To change how walls look, edit `Renderer::generateWallTexture()` in `src/Renderer.cpp`:
+
+* **Brick size** – adjust `brickH` and `brickW` to make bricks taller or wider.
+* **Mortar thickness** – change `mortarSize`.
+* **Colour palette** – modify the base RGB values (`140, 135, 125`) or mortar colour
+  (`60, 58, 55`).
+* **Noise intensity** – tweak `bVar` and `pNoise` ranges for rougher or smoother
+  stone.
+
+### Loading an external texture
+
+If you prefer to load a texture from a file (e.g. PNG) instead of generating one
+procedurally:
+
+1. Add [stb_image](https://github.com/nothings/stb) (`stb_image.h`) to `include/`.
+2. At the top of `src/Renderer.cpp` (outside any function), add:
+   ```cpp
+   #define STB_IMAGE_IMPLEMENTATION
+   #include "stb_image.h"
+   ```
+3. In `generateWallTexture()`, replace the pixel-generation loop with:
+   ```cpp
+   int w, h, channels;
+   unsigned char* data = stbi_load("textures/wall.png", &w, &h, &channels, 3);
+   ```
+4. Pass `data`, `w` and `h` to `glTexImage2D` instead of the `pixels` vector.
+5. Call `stbi_image_free(data)` after uploading.
+
+The rest of the rendering pipeline (shaders, UVs, `useTexture` uniform) stays the
+same.
 
 ## License
 
