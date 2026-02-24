@@ -49,3 +49,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 
 # Copy shaders to build directory
 file(COPY ${CMAKE_SOURCE_DIR}/shaders DESTINATION ${CMAKE_BINARY_DIR})
+
+# Copy textures to build directory
+file(COPY ${CMAKE_SOURCE_DIR}/textures DESTINATION ${CMAKE_BINARY_DIR})
