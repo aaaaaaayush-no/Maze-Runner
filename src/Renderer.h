@@ -74,7 +74,7 @@ private:
 
     // Graffiti config: filenames to load from textures/graffiti/
     static const std::vector<std::string> GRAFFITI_FILES;
-    static constexpr float GRAFFITI_CHANCE = 0.25f; // 25% chance per eligible wall face
+    static constexpr float GRAFFITI_CHANCE = 0.05f; // 5% chance per eligible wall face
 
     bool wireframe;
 

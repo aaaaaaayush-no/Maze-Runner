@@ -34,6 +34,7 @@ private:
     std::mt19937 rng;
 
     void recursiveBacktrack(int cx, int cy);
+    void addExtraPaths();
     std::vector<std::pair<int,int>> getNeighbors(int cx, int cy) const;
     std::vector<std::pair<int,int>> findDeadEnds() const;
 };

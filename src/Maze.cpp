@@ -18,6 +18,9 @@ void Maze::generate() {
     // Carve paths using recursive backtracking starting at (1,1)
     recursiveBacktrack(1, 1);
 
+    // Add extra connections to create multiple routes (but not near exit)
+    addExtraPaths();
+
     // Ensure start and exit are open
     auto [sx, sy] = getStart();
     grid[sy][sx] = CellType::PATH;
@@ -65,6 +68,57 @@ void Maze::recursiveBacktrack(int cx, int cy) {
             grid[wy][wx] = CellType::PATH;
             recursiveBacktrack(nx, ny);
         }
+    }
+}
+
+void Maze::addExtraPaths() {
+    // Remove ~15% of interior walls between path cells to create loops.
+    // Protect the exit area (last quarter of the maze) so the final
+    // ending part keeps a single-path corridor.
+    auto [ex, ey] = getExit();
+    int protectX = width  * 3 / 4;  // x >= protectX is protected
+    int protectY = height * 3 / 4;  // y >= protectY is protected
+
+    // Collect candidate walls that separate two path cells
+    struct WallCandidate { int wx, wy, c1x, c1y, c2x, c2y; };
+    std::vector<WallCandidate> candidates;
+
+    for (int y = 1; y < height - 1; y++) {
+        for (int x = 1; x < width - 1; x++) {
+            if (grid[y][x] != CellType::WALL) continue;
+
+            // Horizontal wall: odd x, even y — separates (x,y-1) and (x,y+1)
+            if (x % 2 == 1 && y % 2 == 0) {
+                int c1y = y - 1, c2y = y + 1;
+                if (c1y >= 1 && c2y < height - 1 &&
+                    grid[c1y][x] == CellType::PATH &&
+                    grid[c2y][x] == CellType::PATH) {
+                    // Skip if both cells are in the protected exit zone
+                    if (x >= protectX && c1y >= protectY && c2y >= protectY)
+                        continue;
+                    candidates.push_back({x, y, x, c1y, x, c2y});
+                }
+            }
+            // Vertical wall: even x, odd y — separates (x-1,y) and (x+1,y)
+            if (x % 2 == 0 && y % 2 == 1) {
+                int c1x = x - 1, c2x = x + 1;
+                if (c1x >= 1 && c2x < width - 1 &&
+                    grid[y][c1x] == CellType::PATH &&
+                    grid[y][c2x] == CellType::PATH) {
+                    // Skip if both cells are in the protected exit zone
+                    if (c1x >= protectX && c2x >= protectX && y >= protectY)
+                        continue;
+                    candidates.push_back({x, y, c1x, y, c2x, y});
+                }
+            }
+        }
+    }
+
+    // Shuffle and remove ~15% of these walls
+    std::shuffle(candidates.begin(), candidates.end(), rng);
+    int toRemove = std::max(1, (int)(candidates.size() * 15 / 100));
+    for (int i = 0; i < toRemove && i < (int)candidates.size(); i++) {
+        grid[candidates[i].wy][candidates[i].wx] = CellType::PATH;
     }
 }
 
