@@ -118,7 +118,7 @@ cd build
 | Maze algorithm | Recursive backtracking on an odd-dimensioned grid |
 | Difficulty | 4 tiers (EASY–NIGHTMARE) scaling maze size, items and time thresholds |
 | Rendering | VBO/VAO with per-vertex position + color + normal + texcoord (stride 11 floats for maze, 9 for objects) |
-| Textures | Procedural 128×128 stone-brick texture generated at init; `useTexture` uniform toggles sampling in fragment shader |
+| Textures | Procedural 128×128 stone-brick wall texture and 64×64 graffiti decals generated at init; external PNGs loaded when present; `useTexture` uniform toggles sampling in fragment shader |
 | Shading | Directional light (Gouraud) + exponential fog + warm torch tint |
 | Collision | AABB with separate X/Z axis resolution |
 | Physics | Fixed 60 Hz timestep, gravity 9.8 m/s², jump impulse 6.5 m/s |
@@ -177,6 +177,65 @@ To change how walls look, edit `Renderer::generateWallTexture()` in `src/Rendere
 External texture loading via [stb_image](https://github.com/nothings/stb) is
 built in. Simply drop a PNG (or JPEG/BMP/TGA) file at `textures/wall.png` and
 restart the game. The renderer will detect the file and use it automatically.
+
+### Graffiti textures
+
+Random graffiti decals appear on roughly **5 %** of eligible wall faces, adding
+visual variety to the maze. Like the wall texture, graffiti can be loaded from
+external files or generated procedurally.
+
+#### Graffiti location
+
+Place up to four PNG images in:
+
+```
+textures/graffiti/
+├── graffiti_01.png
+├── graffiti_02.png
+├── graffiti_03.png
+└── graffiti_04.png
+```
+
+The path is relative to the working directory (the `build/` folder). CMake
+copies the `textures/graffiti/` directory into the build folder during
+configuration, so you can also place files at the repository root under
+`textures/graffiti/` and rebuild.
+
+At startup the renderer tries to load each file in order:
+
+* **If one or more files are found** – those images are used as the graffiti
+  pool. Any missing files in the sequence are silently skipped.
+* **If no files are found** – four procedural graffiti patterns are generated
+  instead (a red arrow, a yellow-orange X mark, a cyan ring and a green
+  "creeper" face).
+
+#### Creating custom graffiti
+
+* Use **RGBA PNG** files (the alpha channel controls transparency).
+* Any image size works; square images (e.g. 64×64 or 128×128) look best because
+  each decal is mapped to a square wall region.
+* The renderer uses **nearest-neighbour filtering**, so pixel-art style images
+  stay crisp in game.
+
+#### Adjusting graffiti settings
+
+To change graffiti behaviour, edit the following in `src/Renderer.h` and
+`src/Renderer.cpp`:
+
+* **Spawn probability** – `GRAFFITI_CHANCE` in `Renderer.h` (default `0.05f`,
+  i.e. 5 %). Increase for more graffiti, decrease for less.
+* **Adding more images** – append filenames to the `GRAFFITI_FILES` vector at
+  the top of `Renderer.cpp` and drop the corresponding PNGs into
+  `textures/graffiti/`:
+  ```cpp
+  const std::vector<std::string> Renderer::GRAFFITI_FILES = {
+      "graffiti_01.png",
+      "graffiti_02.png",
+      "graffiti_03.png",
+      "graffiti_04.png",
+      "graffiti_05.png"   // ← your new file
+  };
+  ```
 
 ## License
 
