@@ -11,7 +11,7 @@ TorchLight::TorchLight()
     : enabled(false)
     , position(0.0f)
     , baseColor(1.0f, 0.7f, 0.3f)  // orange-yellow
-    , radius(12.0f)
+    , radius(20.0f)
     , flickerTimer(0.0f)
     , flickerIntensity(1.0f)
     , glowVAO(0), glowVBO(0), glowVertexCount(0)
@@ -37,7 +37,7 @@ void TorchLight::update(float dt) {
     flickerTimer += dt;
 
     // Combine multiple sine waves for realistic flicker
-    flickerIntensity = 0.85f
+    flickerIntensity = 1.0f
         + 0.08f * std::sin(flickerTimer * 13.0f)
         + 0.05f * std::sin(flickerTimer * 23.0f)
         + 0.02f * std::sin(flickerTimer * 37.0f);

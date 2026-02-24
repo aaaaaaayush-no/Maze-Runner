@@ -208,8 +208,8 @@ glm::vec3 SkyRenderer::getSunColor() const {
         float warmth = midDist * 0.3f;
         return glm::vec3(1.0f, 0.9f - warmth * 0.3f, 0.75f - warmth * 0.4f);
     } else {
-        // Nighttime: pale blue-white moonlight
-        return glm::vec3(0.4f, 0.45f, 0.6f);
+        // Nighttime: pale blue-white moonlight (brighter)
+        return glm::vec3(0.55f, 0.6f, 0.8f);
     }
 }
 
@@ -450,6 +450,38 @@ void SkyRenderer::render(const glm::mat4& view, const glm::mat4& projection) {
         glEnableVertexAttribArray(1);
 
         glDrawArrays(GL_TRIANGLES, 0, sunVCount);
+
+        // Render moonlight glow halo around the moon at night
+        if (!isSun) {
+            std::vector<float> glowVerts;
+            int glowSegments = 16;
+            float glowRadius = bSize * 8.0f;
+            glm::vec3 glowCol = bodyColor * 0.3f; // soft glow
+
+            for (int seg = 0; seg < glowSegments; seg++) {
+                float a0 = 2.0f * (float)M_PI * seg / glowSegments;
+                float a1 = 2.0f * (float)M_PI * (seg + 1) / glowSegments;
+
+                // Center vertex (brighter)
+                glowVerts.insert(glowVerts.end(), {0.0f, 0.0f, 0.0f,
+                    bodyColor.r * 0.5f, bodyColor.g * 0.5f, bodyColor.b * 0.5f});
+                // Outer vertices (faded)
+                glowVerts.insert(glowVerts.end(), {glowRadius * std::cos(a0), glowRadius * std::sin(a0), 0.0f,
+                    glowCol.r, glowCol.g, glowCol.b});
+                glowVerts.insert(glowVerts.end(), {glowRadius * std::cos(a1), glowRadius * std::sin(a1), 0.0f,
+                    glowCol.r, glowCol.g, glowCol.b});
+            }
+
+            int glowVCount = (int)(glowVerts.size() / 6);
+            glBindBuffer(GL_ARRAY_BUFFER, sunVBO);
+            glBufferData(GL_ARRAY_BUFFER, glowVerts.size() * sizeof(float), glowVerts.data(), GL_DYNAMIC_DRAW);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+            glEnableVertexAttribArray(1);
+
+            glDrawArrays(GL_TRIANGLES, 0, glowVCount);
+        }
     }
 
     glDepthMask(GL_TRUE);
