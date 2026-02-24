@@ -160,6 +160,7 @@ void HandRenderer::render(Shader& shader, float aspect) {
     shader.setVec3("fogColor", glm::vec3(0.05f, 0.05f, 0.08f));
     shader.setFloat("fogDensity", 0.0f); // no fog on hands
     shader.setFloat("fogGradient", 1.0f);
+    shader.setBool("useTexture", false);
 
     // Render hands with separate depth range so they're always on top
     glDepthRange(0.0, 0.1);

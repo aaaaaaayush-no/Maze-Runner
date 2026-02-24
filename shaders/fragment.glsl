@@ -3,12 +3,15 @@
 in vec3 FragColor;
 in vec3 FragNormal;
 in vec3 FragPos;
+in vec2 TexCoord;
 in float Visibility;
 
 out vec4 outColor;
 
 uniform vec3 lightDir;
 uniform vec3 fogColor;
+uniform sampler2D wallTexture;
+uniform bool useTexture;
 
 void main()
 {
@@ -21,7 +24,13 @@ void main()
 
     // Warm tint to simulate torch light
     vec3 warmTint = vec3(1.0, 0.92, 0.82);
-    vec3 color = FragColor * light * warmTint;
+
+    vec3 baseColor = FragColor;
+    if (useTexture) {
+        baseColor = texture(wallTexture, TexCoord).rgb * FragColor;
+    }
+
+    vec3 color = baseColor * light * warmTint;
 
     // Mix with fog
     color = mix(fogColor, color, Visibility);

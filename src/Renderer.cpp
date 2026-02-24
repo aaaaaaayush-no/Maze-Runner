@@ -13,6 +13,7 @@ Renderer::Renderer()
     , cubeVAO(0), cubeVBO(0), cubeVertexCount(0)
     , pyramidVAO(0), pyramidVBO(0), pyramidVertexCount(0)
     , sphereVAO(0), sphereVBO(0), sphereVertexCount(0)
+    , wallTextureID(0)
     , wireframe(false)
 {
 }
@@ -22,9 +23,11 @@ Renderer::~Renderer() {
     if (cubeVAO) { glDeleteVertexArrays(1, &cubeVAO); glDeleteBuffers(1, &cubeVBO); }
     if (pyramidVAO) { glDeleteVertexArrays(1, &pyramidVAO); glDeleteBuffers(1, &pyramidVBO); }
     if (sphereVAO) { glDeleteVertexArrays(1, &sphereVAO); glDeleteBuffers(1, &sphereVBO); }
+    if (wallTextureID) { glDeleteTextures(1, &wallTextureID); }
 }
 
 void Renderer::init() {
+    generateWallTexture();
     buildCubeMesh();
     buildPyramidMesh();
     buildSphereMesh();
@@ -57,6 +60,66 @@ static void pushQuad(std::vector<float>& v,
     pushVertex(v, x2,y2,z2, r,g,b, nx,ny,nz);
     pushVertex(v, x3,y3,z3, r,g,b, nx,ny,nz);
     pushVertex(v, x0,y0,z0, r,g,b, nx,ny,nz);
+}
+
+// Helper: add a vertex (pos + color + normal + texcoord) for textured mesh
+static void pushVertexUV(std::vector<float>& v,
+                         float px, float py, float pz,
+                         float r, float g, float b,
+                         float nx, float ny, float nz,
+                         float u, float uv) {
+    v.insert(v.end(), {px, py, pz, r, g, b, nx, ny, nz, u, uv});
+}
+
+// Helper: add a textured quad (two triangles) with UV coordinates
+static void pushQuadUV(std::vector<float>& v,
+                       float x0, float y0, float z0,
+                       float x1, float y1, float z1,
+                       float x2, float y2, float z2,
+                       float x3, float y3, float z3,
+                       float r, float g, float b,
+                       float nx, float ny, float nz,
+                       float u0, float v0, float u1, float v1,
+                       float u2, float v2, float u3, float v3) {
+    pushVertexUV(v, x0,y0,z0, r,g,b, nx,ny,nz, u0,v0);
+    pushVertexUV(v, x1,y1,z1, r,g,b, nx,ny,nz, u1,v1);
+    pushVertexUV(v, x2,y2,z2, r,g,b, nx,ny,nz, u2,v2);
+    pushVertexUV(v, x2,y2,z2, r,g,b, nx,ny,nz, u2,v2);
+    pushVertexUV(v, x3,y3,z3, r,g,b, nx,ny,nz, u3,v3);
+    pushVertexUV(v, x0,y0,z0, r,g,b, nx,ny,nz, u0,v0);
+}
+
+// Add a textured cube with UV mapping per face
+static void addCubeTextured(std::vector<float>& verts,
+                            float x, float y, float z,
+                            float sx, float sy, float sz,
+                            float r, float g, float b) {
+    float x0 = x, x1 = x + sx;
+    float y0 = y, y1 = y + sy;
+    float z0 = z, z1 = z + sz;
+
+    // UV tiling: 1 repeat per face
+    float u0 = 0.0f, u1 = 1.0f;
+    float v0t = 0.0f, v1t = 1.0f;
+
+    // Front  (+Z)
+    pushQuadUV(verts, x0,y0,z1, x1,y0,z1, x1,y1,z1, x0,y1,z1, r,g,b, 0,0,1,
+               u0,v0t, u1,v0t, u1,v1t, u0,v1t);
+    // Back   (-Z)
+    pushQuadUV(verts, x1,y0,z0, x0,y0,z0, x0,y1,z0, x1,y1,z0, r,g,b, 0,0,-1,
+               u0,v0t, u1,v0t, u1,v1t, u0,v1t);
+    // Left   (-X)
+    pushQuadUV(verts, x0,y0,z0, x0,y0,z1, x0,y1,z1, x0,y1,z0, r,g,b, -1,0,0,
+               u0,v0t, u1,v0t, u1,v1t, u0,v1t);
+    // Right  (+X)
+    pushQuadUV(verts, x1,y0,z1, x1,y0,z0, x1,y1,z0, x1,y1,z1, r,g,b, 1,0,0,
+               u0,v0t, u1,v0t, u1,v1t, u0,v1t);
+    // Top    (+Y)
+    pushQuadUV(verts, x0,y1,z1, x1,y1,z1, x1,y1,z0, x0,y1,z0, r,g,b, 0,1,0,
+               u0,v0t, u1,v0t, u1,v1t, u0,v1t);
+    // Bottom (-Y)
+    pushQuadUV(verts, x0,y0,z0, x1,y0,z0, x1,y0,z1, x0,y0,z1, r,g,b, 0,-1,0,
+               u0,v0t, u1,v0t, u1,v1t, u0,v1t);
 }
 
 void Renderer::addCube(std::vector<float>& verts,
@@ -112,7 +175,7 @@ void Renderer::buildMazeMesh(const Maze& maze) {
                     // Standard stone brick
                     wr = 0.45f + variation; wg = 0.43f + variation; wb = 0.40f + variation;
                 }
-                addCube(verts, wx, 0.0f, wz, CELL_SIZE, WALL_HEIGHT, CELL_SIZE,
+                addCubeTextured(verts, wx, 0.0f, wz, CELL_SIZE, WALL_HEIGHT, CELL_SIZE,
                         wr, wg, wb);
             } else {
                 // Minecraft stone floor
@@ -122,27 +185,30 @@ void Renderer::buildMazeMesh(const Maze& maze) {
                 float fvar = (float)(fhash % 100) / 600.0f;
                 float fr = 0.30f + fvar, fg = 0.30f + fvar, fb = 0.32f + fvar;
 
-                // Floor
-                pushQuad(verts,
+                // Floor (textured)
+                pushQuadUV(verts,
                     wx,         0.0f, wz,
                     wx+CELL_SIZE, 0.0f, wz,
                     wx+CELL_SIZE, 0.0f, wz+CELL_SIZE,
                     wx,         0.0f, wz+CELL_SIZE,
                     fr, fg, fb,
-                    0.0f, 1.0f, 0.0f);
-                // Ceiling (dark stone)
-                pushQuad(verts,
+                    0.0f, 1.0f, 0.0f,
+                    0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f);
+                // Ceiling (dark stone, textured)
+                pushQuadUV(verts,
                     wx,         WALL_HEIGHT, wz+CELL_SIZE,
                     wx+CELL_SIZE, WALL_HEIGHT, wz+CELL_SIZE,
                     wx+CELL_SIZE, WALL_HEIGHT, wz,
                     wx,         WALL_HEIGHT, wz,
                     0.12f, 0.12f, 0.15f,
-                    0.0f, -1.0f, 0.0f);
+                    0.0f, -1.0f, 0.0f,
+                    0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f);
             }
         }
     }
 
-    mazeVertexCount = (int)(verts.size() / 9);
+    // Stride is 11 floats: pos(3) + color(3) + normal(3) + texcoord(2)
+    mazeVertexCount = (int)(verts.size() / 11);
 
     if (mazeVAO) { glDeleteVertexArrays(1, &mazeVAO); glDeleteBuffers(1, &mazeVBO); }
 
@@ -154,16 +220,85 @@ void Renderer::buildMazeMesh(const Maze& maze) {
     glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(float), verts.data(), GL_STATIC_DRAW);
 
     // Position
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
     // Color
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(3 * sizeof(float)));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
     // Normal
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(6 * sizeof(float)));
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(float), (void*)(6 * sizeof(float)));
     glEnableVertexAttribArray(2);
+    // TexCoord
+    glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, 11 * sizeof(float), (void*)(9 * sizeof(float)));
+    glEnableVertexAttribArray(3);
 
     glBindVertexArray(0);
+}
+
+void Renderer::generateWallTexture() {
+    const int TEX_SIZE = 128;
+    std::vector<unsigned char> pixels(TEX_SIZE * TEX_SIZE * 3);
+
+    // Stone brick pattern: 4 rows of bricks, offset every other row
+    const int brickH = TEX_SIZE / 4;        // brick height in pixels
+    const int brickW = TEX_SIZE / 2;        // brick width in pixels
+    const int mortarSize = 2;               // mortar line thickness
+
+    for (int y = 0; y < TEX_SIZE; y++) {
+        for (int x = 0; x < TEX_SIZE; x++) {
+            int row = y / brickH;
+            int offsetX = (row % 2 == 1) ? brickW / 2 : 0;
+            int localX = (x + offsetX) % TEX_SIZE;
+            int brickCol = localX / brickW;
+            int inBrickX = localX % brickW;
+            int inBrickY = y % brickH;
+
+            // Check if pixel is mortar
+            bool isMortar = (inBrickX < mortarSize || inBrickY < mortarSize);
+
+            int idx = (y * TEX_SIZE + x) * 3;
+
+            if (isMortar) {
+                // Dark mortar
+                pixels[idx + 0] = 60;
+                pixels[idx + 1] = 58;
+                pixels[idx + 2] = 55;
+            } else {
+                // Brick color with per-brick variation
+                unsigned int bHash = (unsigned int)(row * 1237 + brickCol * 4391 + 7);
+                bHash = ((bHash >> 16) ^ bHash) * 0x45d9f3b;
+                bHash = (bHash >> 16) ^ bHash;
+                int bVar = (int)(bHash % 30) - 15;
+
+                // Per-pixel noise for stone texture
+                unsigned int pHash = (unsigned int)(x * 131 + y * 997);
+                pHash = ((pHash >> 16) ^ pHash) * 0x45d9f3b;
+                pHash = (pHash >> 16) ^ pHash;
+                int pNoise = (int)(pHash % 20) - 10;
+
+                int base_r = 140 + bVar + pNoise;
+                int base_g = 135 + bVar + pNoise;
+                int base_b = 125 + bVar + pNoise;
+
+                pixels[idx + 0] = (unsigned char)(base_r < 0 ? 0 : (base_r > 255 ? 255 : base_r));
+                pixels[idx + 1] = (unsigned char)(base_g < 0 ? 0 : (base_g > 255 ? 255 : base_g));
+                pixels[idx + 2] = (unsigned char)(base_b < 0 ? 0 : (base_b > 255 ? 255 : base_b));
+            }
+        }
+    }
+
+    glGenTextures(1, &wallTextureID);
+    glBindTexture(GL_TEXTURE_2D, wallTextureID);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, TEX_SIZE, TEX_SIZE, 0,
+                 GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 void Renderer::renderMaze(Shader& shader, const glm::mat4& view, const glm::mat4& projection) {
@@ -178,6 +313,12 @@ void Renderer::renderMaze(Shader& shader, const glm::mat4& view, const glm::mat4
     shader.setVec3("fogColor", glm::vec3(0.02f, 0.03f, 0.06f));
     shader.setFloat("fogDensity", 0.035f);
     shader.setFloat("fogGradient", 2.0f);
+
+    // Bind wall texture
+    shader.setBool("useTexture", true);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, wallTextureID);
+    shader.setInt("wallTexture", 0);
 
     glBindVertexArray(mazeVAO);
     glDrawArrays(GL_TRIANGLES, 0, mazeVertexCount);
@@ -304,6 +445,7 @@ void Renderer::renderCollectibles(Shader& shader, const glm::mat4& view,
     shader.setVec3("fogColor", glm::vec3(0.02f, 0.03f, 0.06f));
     shader.setFloat("fogDensity", 0.035f);
     shader.setFloat("fogGradient", 2.0f);
+    shader.setBool("useTexture", false);
 
     for (auto& item : items) {
         if (item.collected) continue;
@@ -345,6 +487,7 @@ void Renderer::renderExitPortal(Shader& shader, const glm::mat4& view,
     shader.setVec3("fogColor", glm::vec3(0.02f, 0.03f, 0.06f));
     shader.setFloat("fogDensity", 0.035f);
     shader.setFloat("fogGradient", 2.0f);
+    shader.setBool("useTexture", false);
 
     // Nether portal style: purple/magenta pulsing
     float pulse = 0.7f + 0.3f * sin(time * 3.0f);
