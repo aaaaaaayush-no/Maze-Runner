@@ -6,7 +6,7 @@ A 3D first-person maze exploration game built with OpenGL 3.3, featuring procedu
 
 ## Features
 
-- **Procedural Maze Generation** – Recursive backtracking algorithm creates a unique maze every game (configurable 21×21 grid)
+- **Procedural Maze Generation** – Recursive backtracking algorithm creates a unique maze every game (21×21 grid, adjustable via constants in `main.cpp`)
 - **First-Person 3D Rendering** – Flat-shaded geometry with fog for depth perception, wireframe toggle
 - **Physics** – Gravity (9.8 m/s²) and jump mechanics with AABB wall collision
 - **Minimap** – Top-right overlay with fog-of-war, player arrow, item markers and exit indicator (toggle with M)

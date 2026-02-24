@@ -22,7 +22,6 @@ public:
     glm::vec3 getFront() const;
 
     bool isOnGround() const { return onGround; }
-    int getCollectedCount() const { return 0; } // Managed externally
 
 private:
     float moveSpeed;

@@ -326,10 +326,7 @@ void Renderer::renderExitPortal(Shader& shader, const glm::mat4& view,
     model = glm::scale(model, glm::vec3(0.8f * pulse, 1.5f * pulse, 0.8f * pulse));
     shader.setMat4("model", model);
 
-    // Reuse cube mesh with green tint (the shader uses vertex colors,
-    // so we just render the cube; it will appear golden from the mesh color).
-    // For a proper green portal, we would need a separate mesh. Instead,
-    // we render the sphere (cyan) scaled up as the portal indicator.
+    // Render the sphere mesh scaled up as the pulsing portal indicator.
     glBindVertexArray(sphereVAO);
     glDrawArrays(GL_TRIANGLES, 0, sphereVertexCount);
     glBindVertexArray(0);

@@ -415,7 +415,6 @@ int main() {
 
             // Win screen
             if (game.won) {
-                std::snprintf(buf, sizeof(buf), "%02d:%02d", mins, secs);
                 hud.renderText(hudShader, buf,
                                (float)screenWidth / 2 - 60,
                                (float)screenHeight / 2,
