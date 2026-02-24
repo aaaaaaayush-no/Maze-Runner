@@ -182,12 +182,15 @@ void Renderer::buildMazeMesh(const Maze& maze) {
                 addCubeTextured(verts, wx, 0.0f, wz, CELL_SIZE, WALL_HEIGHT, CELL_SIZE,
                         wr, wg, wb);
             } else {
-                // Minecraft stone floor
+                // Minecraft grass block floor
                 unsigned int fhash = (unsigned int)(x * 3571 + y * 7907);
                 fhash = ((fhash >> 16) ^ fhash) * 0x45d9f3b;
                 fhash = (fhash >> 16) ^ fhash;
                 float fvar = (float)(fhash % 100) / 600.0f;
-                float fr = 0.30f + fvar, fg = 0.30f + fvar, fb = 0.32f + fvar;
+                // Grass green color with variation
+                float fr = 0.28f + fvar * 0.5f;
+                float fg = 0.45f + fvar;
+                float fb = 0.18f + fvar * 0.3f;
 
                 // Floor (textured)
                 pushQuadUV(verts,
@@ -308,26 +311,47 @@ void Renderer::generateWallTexture() {
 
     glGenerateMipmap(GL_TEXTURE_2D);
 
+    // Use nearest-neighbor filtering for pixelated Minecraft look
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-void Renderer::renderMaze(Shader& shader, const glm::mat4& view, const glm::mat4& projection) {
+// Helper to set lighting uniforms on shader
+static void setLightingUniforms(Shader& shader,
+                                const glm::vec3& sunDir, const glm::vec3& sunColor,
+                                float ambientLevel, const glm::vec3& fogCol,
+                                bool torchEnabled, const glm::vec3& torchPos,
+                                const glm::vec3& torchColor, float torchRadius) {
+    shader.setVec3("lightDir", sunDir);
+    shader.setVec3("fogColor", fogCol);
+    shader.setFloat("fogDensity", 0.035f);
+    shader.setFloat("fogGradient", 2.0f);
+    shader.setVec3("sunColor", sunColor);
+    shader.setFloat("ambientLevel", ambientLevel);
+    shader.setBool("torchEnabled", torchEnabled);
+    shader.setVec3("torchPos", torchPos);
+    shader.setVec3("torchColor", torchColor);
+    shader.setFloat("torchRadius", torchRadius);
+    shader.setBool("enableEdgeOutline", true);
+}
+
+void Renderer::renderMaze(Shader& shader, const glm::mat4& view, const glm::mat4& projection,
+                           const glm::vec3& sunDir, const glm::vec3& sunColor,
+                           float ambientLevel, const glm::vec3& fogCol,
+                           bool torchEnabled, const glm::vec3& torchPos,
+                           const glm::vec3& torchColor, float torchRadius) {
     shader.use();
     glm::mat4 model = glm::mat4(1.0f);
     shader.setMat4("model", model);
     shader.setMat4("view", view);
     shader.setMat4("projection", projection);
-    // Warmer torch-like lighting direction
-    shader.setVec3("lightDir", glm::vec3(0.2f, 0.8f, 0.4f));
-    // Blue-tinted distance fog (Minecraft-style)
-    shader.setVec3("fogColor", glm::vec3(0.02f, 0.03f, 0.06f));
-    shader.setFloat("fogDensity", 0.035f);
-    shader.setFloat("fogGradient", 2.0f);
+
+    setLightingUniforms(shader, sunDir, sunColor, ambientLevel, fogCol,
+                        torchEnabled, torchPos, torchColor, torchRadius);
 
     // Bind wall texture
     shader.setBool("useTexture", true);
@@ -452,15 +476,18 @@ void Renderer::buildSphereMesh() {
 
 void Renderer::renderCollectibles(Shader& shader, const glm::mat4& view,
                                   const glm::mat4& projection,
-                                  const std::vector<CollectibleItem>& items) {
+                                  const std::vector<CollectibleItem>& items,
+                                  const glm::vec3& sunDir, const glm::vec3& sunColor,
+                                  float ambientLevel, const glm::vec3& fogCol,
+                                  bool torchEnabled, const glm::vec3& torchPos,
+                                  const glm::vec3& torchColor, float torchRadius) {
     shader.use();
     shader.setMat4("view", view);
     shader.setMat4("projection", projection);
-    shader.setVec3("lightDir", glm::vec3(0.2f, 0.8f, 0.4f));
-    shader.setVec3("fogColor", glm::vec3(0.02f, 0.03f, 0.06f));
-    shader.setFloat("fogDensity", 0.035f);
-    shader.setFloat("fogGradient", 2.0f);
+    setLightingUniforms(shader, sunDir, sunColor, ambientLevel, fogCol,
+                        torchEnabled, torchPos, torchColor, torchRadius);
     shader.setBool("useTexture", false);
+    shader.setBool("enableEdgeOutline", false);
 
     for (auto& item : items) {
         if (item.collected) continue;
@@ -494,15 +521,18 @@ void Renderer::renderCollectibles(Shader& shader, const glm::mat4& view,
 
 void Renderer::renderExitPortal(Shader& shader, const glm::mat4& view,
                                 const glm::mat4& projection,
-                                const glm::vec3& exitPos, float time) {
+                                const glm::vec3& exitPos, float time,
+                                const glm::vec3& sunDir, const glm::vec3& sunColor,
+                                float ambientLevel, const glm::vec3& fogCol,
+                                bool torchEnabled, const glm::vec3& torchPos,
+                                const glm::vec3& torchColor, float torchRadius) {
     shader.use();
     shader.setMat4("view", view);
     shader.setMat4("projection", projection);
-    shader.setVec3("lightDir", glm::vec3(0.2f, 0.8f, 0.4f));
-    shader.setVec3("fogColor", glm::vec3(0.02f, 0.03f, 0.06f));
-    shader.setFloat("fogDensity", 0.035f);
-    shader.setFloat("fogGradient", 2.0f);
+    setLightingUniforms(shader, sunDir, sunColor, ambientLevel, fogCol,
+                        torchEnabled, torchPos, torchColor, torchRadius);
     shader.setBool("useTexture", false);
+    shader.setBool("enableEdgeOutline", false);
 
     // Nether portal style: purple/magenta pulsing
     float pulse = 0.7f + 0.3f * sin(time * 3.0f);

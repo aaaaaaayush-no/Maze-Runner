@@ -16,13 +16,25 @@ public:
 
     void init();
     void buildMazeMesh(const Maze& maze);
-    void renderMaze(Shader& shader, const glm::mat4& view, const glm::mat4& projection);
+    void renderMaze(Shader& shader, const glm::mat4& view, const glm::mat4& projection,
+                    const glm::vec3& sunDir, const glm::vec3& sunColor,
+                    float ambientLevel, const glm::vec3& fogCol,
+                    bool torchEnabled, const glm::vec3& torchPos,
+                    const glm::vec3& torchColor, float torchRadius);
     void renderCollectibles(Shader& shader, const glm::mat4& view,
                             const glm::mat4& projection,
-                            const std::vector<CollectibleItem>& items);
+                            const std::vector<CollectibleItem>& items,
+                            const glm::vec3& sunDir, const glm::vec3& sunColor,
+                            float ambientLevel, const glm::vec3& fogCol,
+                            bool torchEnabled, const glm::vec3& torchPos,
+                            const glm::vec3& torchColor, float torchRadius);
     void renderExitPortal(Shader& shader, const glm::mat4& view,
                           const glm::mat4& projection,
-                          const glm::vec3& exitPos, float time);
+                          const glm::vec3& exitPos, float time,
+                          const glm::vec3& sunDir, const glm::vec3& sunColor,
+                          float ambientLevel, const glm::vec3& fogCol,
+                          bool torchEnabled, const glm::vec3& torchPos,
+                          const glm::vec3& torchColor, float torchRadius);
 
     void setWireframe(bool enabled);
 

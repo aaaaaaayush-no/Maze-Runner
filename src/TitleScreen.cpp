@@ -343,15 +343,28 @@ void TitleScreen::drawMenu(std::vector<float>& verts, float time) {
         float r = 0.8f, g = 0.8f, b = 0.8f;
 
         if (i == menuIndex && !inSettings) {
-            // Selected item: yellow with bobbing
-            r = 1.0f; g = 1.0f; b = 0.3f;
+            // Selected item: pulsing glow effect
+            float pulse = 0.7f + 0.3f * std::sin(time * 3.5f);
+            r = 1.0f * pulse; g = 1.0f * pulse; b = 0.3f * pulse;
             itemBob = std::sin(time * 4.0f) * 0.005f;
 
-            // Draw selection arrow
+            // Draw selection arrow (also pulses)
             std::string arrow = ">";
             float arrowX = -0.35f;
             float arrowY = startY - i * spacing + itemBob;
             renderBlockText(verts, arrow, arrowX, arrowY, menuPixel, r, g, b);
+
+            // Glow background behind selected item
+            std::string text = items[i];
+            float textWidth = getTextWidth(text, menuPixel);
+            float glowAlpha = 0.1f + 0.08f * std::sin(time * 3.5f);
+            float glowPad = 0.02f;
+            pushQuad(verts,
+                     -textWidth / 2.0f - glowPad,
+                     startY - i * spacing - 0.01f,
+                     textWidth / 2.0f + glowPad,
+                     startY - i * spacing + 7.0f * menuPixel + 0.01f,
+                     glowAlpha * 1.0f, glowAlpha * 0.8f, glowAlpha * 0.1f);
         }
 
         std::string text = items[i];
