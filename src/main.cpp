@@ -367,10 +367,9 @@ int main() {
         glClearColor(0.05f, 0.05f, 0.08f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        float aspect = (screenHeight > 0) ? (float)screenWidth / (float)screenHeight : 1.0f;
         glm::mat4 projection = glm::perspective(
-            glm::radians(70.0f),
-            (float)screenWidth / (float)screenHeight,
-            0.1f, 200.0f);
+            glm::radians(70.0f), aspect, 0.1f, 200.0f);
         glm::mat4 view = game.player.getViewMatrix();
 
         // Maze
