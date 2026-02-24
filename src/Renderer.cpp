@@ -67,8 +67,8 @@ static void pushVertexUV(std::vector<float>& v,
                          float px, float py, float pz,
                          float r, float g, float b,
                          float nx, float ny, float nz,
-                         float u, float uv) {
-    v.insert(v.end(), {px, py, pz, r, g, b, nx, ny, nz, u, uv});
+                         float u, float tv) {
+    v.insert(v.end(), {px, py, pz, r, g, b, nx, ny, nz, u, tv});
 }
 
 // Helper: add a textured quad (two triangles) with UV coordinates
@@ -100,26 +100,26 @@ static void addCubeTextured(std::vector<float>& verts,
 
     // UV tiling: 1 repeat per face
     float u0 = 0.0f, u1 = 1.0f;
-    float v0t = 0.0f, v1t = 1.0f;
+    float tv0 = 0.0f, tv1 = 1.0f;
 
     // Front  (+Z)
     pushQuadUV(verts, x0,y0,z1, x1,y0,z1, x1,y1,z1, x0,y1,z1, r,g,b, 0,0,1,
-               u0,v0t, u1,v0t, u1,v1t, u0,v1t);
+               u0,tv0, u1,tv0, u1,tv1, u0,tv1);
     // Back   (-Z)
     pushQuadUV(verts, x1,y0,z0, x0,y0,z0, x0,y1,z0, x1,y1,z0, r,g,b, 0,0,-1,
-               u0,v0t, u1,v0t, u1,v1t, u0,v1t);
+               u0,tv0, u1,tv0, u1,tv1, u0,tv1);
     // Left   (-X)
     pushQuadUV(verts, x0,y0,z0, x0,y0,z1, x0,y1,z1, x0,y1,z0, r,g,b, -1,0,0,
-               u0,v0t, u1,v0t, u1,v1t, u0,v1t);
+               u0,tv0, u1,tv0, u1,tv1, u0,tv1);
     // Right  (+X)
     pushQuadUV(verts, x1,y0,z1, x1,y0,z0, x1,y1,z0, x1,y1,z1, r,g,b, 1,0,0,
-               u0,v0t, u1,v0t, u1,v1t, u0,v1t);
+               u0,tv0, u1,tv0, u1,tv1, u0,tv1);
     // Top    (+Y)
     pushQuadUV(verts, x0,y1,z1, x1,y1,z1, x1,y1,z0, x0,y1,z0, r,g,b, 0,1,0,
-               u0,v0t, u1,v0t, u1,v1t, u0,v1t);
+               u0,tv0, u1,tv0, u1,tv1, u0,tv1);
     // Bottom (-Y)
     pushQuadUV(verts, x0,y0,z0, x1,y0,z0, x1,y0,z1, x0,y0,z1, r,g,b, 0,-1,0,
-               u0,v0t, u1,v0t, u1,v1t, u0,v1t);
+               u0,tv0, u1,tv0, u1,tv1, u0,tv1);
 }
 
 void Renderer::addCube(std::vector<float>& verts,
