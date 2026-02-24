@@ -2,6 +2,8 @@
 build/
 cmake-build-*/
 out/
+_codeql_build_dir/
+_codeql_detected_source_root
 
 # IDE
 .vs/
@@ -21,6 +23,9 @@ out/
 *.lib
 *.dll
 *.so
+
+# Runtime data
+highscores.txt
 
 # OS
 .DS_Store
