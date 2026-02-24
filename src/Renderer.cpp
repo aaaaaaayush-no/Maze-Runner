@@ -247,13 +247,13 @@ void Renderer::generateWallTexture() {
     int imgW, imgH, imgChannels;
     unsigned char* data = stbi_load("textures/wall.png", &imgW, &imgH, &imgChannels, 3);
     if (data) {
-        std::cout << "Loaded wall texture from textures/wall.png ("
+        std::cerr << "Loaded wall texture from textures/wall.png ("
                   << imgW << "x" << imgH << ")\n";
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, imgW, imgH, 0,
                      GL_RGB, GL_UNSIGNED_BYTE, data);
         stbi_image_free(data);
     } else {
-        std::cout << "textures/wall.png not found, using procedural texture\n";
+        std::cerr << "textures/wall.png not found, using procedural texture\n";
 
         // Fall back to procedural stone brick texture
         const int TEX_SIZE = 128;
