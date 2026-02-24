@@ -30,6 +30,8 @@ set(SOURCES
     src/Shader.cpp
     src/TitleScreen.cpp
     src/HandRenderer.cpp
+    src/SkyRenderer.cpp
+    src/TorchLight.cpp
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES})

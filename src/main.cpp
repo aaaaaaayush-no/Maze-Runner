@@ -13,6 +13,8 @@
 #include "Highscore.h"
 #include "TitleScreen.h"
 #include "HandRenderer.h"
+#include "SkyRenderer.h"
+#include "TorchLight.h"
 
 #include <iostream>
 #include <string>
@@ -40,6 +42,7 @@ static bool requestRestart = false;
 static bool requestWireToggle = false;
 static bool requestMinimapToggle = false;
 static bool requestLegendToggle = false;
+static bool requestTorchToggle = false;
 
 static Difficulty currentDifficulty = Difficulty::MEDIUM;
 static GameScreen currentScreen = GameScreen::TITLE_SCREEN;
@@ -354,6 +357,7 @@ static void keyCallback(GLFWwindow* window, int key, int /*scancode*/, int actio
         case GLFW_KEY_F1: if (down) requestWireToggle = true; break;
         case GLFW_KEY_M:  if (down) requestMinimapToggle = true; break;
         case GLFW_KEY_L:  if (down) requestLegendToggle = true; break;
+        case GLFW_KEY_T:  if (down) requestTorchToggle = true; break;
         case GLFW_KEY_ESCAPE:
             if (currentScreen == GameScreen::PLAYING) {
                 currentScreen = GameScreen::TITLE_SCREEN;
@@ -486,6 +490,12 @@ int main() {
     HandRenderer handRenderer;
     handRenderer.init();
 
+    SkyRenderer skyRenderer;
+    skyRenderer.init();
+
+    TorchLight torchLight;
+    torchLight.init();
+
     // Load highscores for star preview
     auto highscores = loadHighscores(HIGHSCORE_FILE);
 
@@ -563,6 +573,10 @@ int main() {
             game.minimap.toggleLegend();
             requestLegendToggle = false;
         }
+        if (requestTorchToggle) {
+            torchLight.toggle();
+            requestTorchToggle = false;
+        }
 
         // Fixed timestep physics
         if (!game.won) {
@@ -575,6 +589,11 @@ int main() {
             }
             game.elapsedTime += frameTime;
         }
+
+        // Update sky and torch
+        skyRenderer.update(frameTime);
+        torchLight.update(frameTime);
+        torchLight.setPlayerPosition(game.player.position, game.player.getFront());
 
         // Update explored cells for minimap
         {
@@ -640,7 +659,8 @@ int main() {
         }
 
         // ── Render ─────────────────────────────────────────────────────────
-        glClearColor(0.02f, 0.03f, 0.06f, 1.0f);
+        glm::vec3 fogCol = skyRenderer.getFogColor();
+        glClearColor(fogCol.r, fogCol.g, fogCol.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         float aspect = (screenHeight > 0) ? (float)screenWidth / (float)screenHeight : 1.0f;
@@ -648,16 +668,39 @@ int main() {
             glm::radians(70.0f), aspect, 0.1f, 200.0f);
         glm::mat4 view = game.player.getViewMatrix();
 
+        // Sky
+        skyRenderer.render(view, projection);
+
+        // Lighting parameters from sky
+        glm::vec3 sunDir = skyRenderer.getSunDirection();
+        glm::vec3 sunColor = skyRenderer.getSunColor();
+        float ambientLevel = skyRenderer.getAmbientLevel();
+
+        // Torch parameters
+        bool torchOn = torchLight.isEnabled();
+        glm::vec3 torchPos = torchLight.getPosition();
+        glm::vec3 torchCol = torchLight.getColor();
+        float torchRadius = torchLight.getRadius();
+
         // Maze
-        game.renderer.renderMaze(mainShader, view, projection);
+        game.renderer.renderMaze(mainShader, view, projection,
+                                  sunDir, sunColor, ambientLevel, fogCol,
+                                  torchOn, torchPos, torchCol, torchRadius);
 
         // Collectibles
         game.renderer.renderCollectibles(mainShader, view, projection,
-                                          game.collectibles.getItems());
+                                          game.collectibles.getItems(),
+                                          sunDir, sunColor, ambientLevel, fogCol,
+                                          torchOn, torchPos, torchCol, torchRadius);
 
         // Exit portal
         game.renderer.renderExitPortal(mainShader, view, projection,
-                                        game.exitWorldPos, currentTime);
+                                        game.exitWorldPos, currentTime,
+                                        sunDir, sunColor, ambientLevel, fogCol,
+                                        torchOn, torchPos, torchCol, torchRadius);
+
+        // Torch glow sprite
+        torchLight.renderGlow(mainShader, view, projection);
 
         // Update and render first-person hands
         {
@@ -765,6 +808,8 @@ int main() {
     hud.cleanup();
     titleScreen.cleanup();
     handRenderer.cleanup();
+    skyRenderer.cleanup();
+    torchLight.cleanup();
     glfwTerminate();
     return 0;
 }

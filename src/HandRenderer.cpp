@@ -161,6 +161,11 @@ void HandRenderer::render(Shader& shader, float aspect) {
     shader.setFloat("fogDensity", 0.0f); // no fog on hands
     shader.setFloat("fogGradient", 1.0f);
     shader.setBool("useTexture", false);
+    // Disable torch and edge outline for hands
+    shader.setBool("torchEnabled", false);
+    shader.setBool("enableEdgeOutline", false);
+    shader.setVec3("sunColor", glm::vec3(1.0f, 0.95f, 0.85f));
+    shader.setFloat("ambientLevel", 0.5f);
 
     // Render hands with separate depth range so they're always on top
     glDepthRange(0.0, 0.1);
