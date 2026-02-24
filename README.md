@@ -128,8 +128,26 @@ cd build
 
 ## Textures
 
-Wall and floor surfaces use a **procedurally generated** stone-brick texture created
-at runtime in `Renderer::generateWallTexture()`. No external image files are needed.
+Wall and floor surfaces use a **procedurally generated** stone-brick texture by default.
+The game also supports loading a **custom wall texture** from a PNG file.
+
+### Texture location
+
+Place your custom wall texture at:
+
+```
+textures/wall.png
+```
+
+This path is relative to the working directory (normally the `build/` folder).
+When CMake configures the project the `textures/` directory is automatically
+copied into the build directory, so you can also place the file at the
+repository root under `textures/wall.png` and rebuild.
+
+At startup the renderer checks for `textures/wall.png`:
+* **If the file exists** – it is loaded and used for all wall and floor surfaces.
+* **If the file is missing** – the procedural stone-brick texture is generated
+  instead (no external files needed).
 
 ### How it works
 
@@ -156,25 +174,9 @@ To change how walls look, edit `Renderer::generateWallTexture()` in `src/Rendere
 
 ### Loading an external texture
 
-If you prefer to load a texture from a file (e.g. PNG) instead of generating one
-procedurally:
-
-1. Add [stb_image](https://github.com/nothings/stb) (`stb_image.h`) to `include/`.
-2. At the top of `src/Renderer.cpp` (outside any function), add:
-   ```cpp
-   #define STB_IMAGE_IMPLEMENTATION
-   #include "stb_image.h"
-   ```
-3. In `generateWallTexture()`, replace the pixel-generation loop with:
-   ```cpp
-   int w, h, channels;
-   unsigned char* data = stbi_load("textures/wall.png", &w, &h, &channels, 3);
-   ```
-4. Pass `data`, `w` and `h` to `glTexImage2D` instead of the `pixels` vector.
-5. Call `stbi_image_free(data)` after uploading.
-
-The rest of the rendering pipeline (shaders, UVs, `useTexture` uniform) stays the
-same.
+External texture loading via [stb_image](https://github.com/nothings/stb) is
+built in. Simply drop a PNG (or JPEG/BMP/TGA) file at `textures/wall.png` and
+restart the game. The renderer will detect the file and use it automatically.
 
 ## License
 

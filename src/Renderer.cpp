@@ -4,6 +4,10 @@
 #include "Shader.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <cmath>
+#include <iostream>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 static const float CELL_SIZE = 2.0f;
 static const float WALL_HEIGHT = 4.0f;
@@ -236,61 +240,72 @@ void Renderer::buildMazeMesh(const Maze& maze) {
 }
 
 void Renderer::generateWallTexture() {
-    const int TEX_SIZE = 128;
-    std::vector<unsigned char> pixels(TEX_SIZE * TEX_SIZE * 3);
-
-    // Stone brick pattern: 4 rows of bricks, offset every other row
-    const int brickH = TEX_SIZE / 4;        // brick height in pixels
-    const int brickW = TEX_SIZE / 2;        // brick width in pixels
-    const int mortarSize = 2;               // mortar line thickness
-
-    for (int y = 0; y < TEX_SIZE; y++) {
-        for (int x = 0; x < TEX_SIZE; x++) {
-            int row = y / brickH;
-            int offsetX = (row % 2 == 1) ? brickW / 2 : 0;
-            int localX = (x + offsetX) % TEX_SIZE;
-            int brickCol = localX / brickW;
-            int inBrickX = localX % brickW;
-            int inBrickY = y % brickH;
-
-            // Check if pixel is mortar
-            bool isMortar = (inBrickX < mortarSize || inBrickY < mortarSize);
-
-            int idx = (y * TEX_SIZE + x) * 3;
-
-            if (isMortar) {
-                // Dark mortar
-                pixels[idx + 0] = 60;
-                pixels[idx + 1] = 58;
-                pixels[idx + 2] = 55;
-            } else {
-                // Brick color with per-brick variation
-                unsigned int bHash = (unsigned int)(row * 1237 + brickCol * 4391 + 7);
-                bHash = ((bHash >> 16) ^ bHash) * 0x45d9f3b;
-                bHash = (bHash >> 16) ^ bHash;
-                int bVar = (int)(bHash % 30) - 15;
-
-                // Per-pixel noise for stone texture
-                unsigned int pHash = (unsigned int)(x * 131 + y * 997);
-                pHash = ((pHash >> 16) ^ pHash) * 0x45d9f3b;
-                pHash = (pHash >> 16) ^ pHash;
-                int pNoise = (int)(pHash % 20) - 10;
-
-                int base_r = 140 + bVar + pNoise;
-                int base_g = 135 + bVar + pNoise;
-                int base_b = 125 + bVar + pNoise;
-
-                pixels[idx + 0] = (unsigned char)(base_r < 0 ? 0 : (base_r > 255 ? 255 : base_r));
-                pixels[idx + 1] = (unsigned char)(base_g < 0 ? 0 : (base_g > 255 ? 255 : base_g));
-                pixels[idx + 2] = (unsigned char)(base_b < 0 ? 0 : (base_b > 255 ? 255 : base_b));
-            }
-        }
-    }
-
     glGenTextures(1, &wallTextureID);
     glBindTexture(GL_TEXTURE_2D, wallTextureID);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, TEX_SIZE, TEX_SIZE, 0,
-                 GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+
+    // Try loading an external texture from textures/wall.png
+    int imgW, imgH, imgChannels;
+    unsigned char* data = stbi_load("textures/wall.png", &imgW, &imgH, &imgChannels, 3);
+    if (data) {
+        std::cout << "Loaded wall texture from textures/wall.png ("
+                  << imgW << "x" << imgH << ")\n";
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, imgW, imgH, 0,
+                     GL_RGB, GL_UNSIGNED_BYTE, data);
+        stbi_image_free(data);
+    } else {
+        std::cout << "textures/wall.png not found, using procedural texture\n";
+
+        // Fall back to procedural stone brick texture
+        const int TEX_SIZE = 128;
+        std::vector<unsigned char> pixels(TEX_SIZE * TEX_SIZE * 3);
+
+        const int brickH = TEX_SIZE / 4;
+        const int brickW = TEX_SIZE / 2;
+        const int mortarSize = 2;
+
+        for (int y = 0; y < TEX_SIZE; y++) {
+            for (int x = 0; x < TEX_SIZE; x++) {
+                int row = y / brickH;
+                int offsetX = (row % 2 == 1) ? brickW / 2 : 0;
+                int localX = (x + offsetX) % TEX_SIZE;
+                int brickCol = localX / brickW;
+                int inBrickX = localX % brickW;
+                int inBrickY = y % brickH;
+
+                bool isMortar = (inBrickX < mortarSize || inBrickY < mortarSize);
+
+                int idx = (y * TEX_SIZE + x) * 3;
+
+                if (isMortar) {
+                    pixels[idx + 0] = 60;
+                    pixels[idx + 1] = 58;
+                    pixels[idx + 2] = 55;
+                } else {
+                    unsigned int bHash = (unsigned int)(row * 1237 + brickCol * 4391 + 7);
+                    bHash = ((bHash >> 16) ^ bHash) * 0x45d9f3b;
+                    bHash = (bHash >> 16) ^ bHash;
+                    int bVar = (int)(bHash % 30) - 15;
+
+                    unsigned int pHash = (unsigned int)(x * 131 + y * 997);
+                    pHash = ((pHash >> 16) ^ pHash) * 0x45d9f3b;
+                    pHash = (pHash >> 16) ^ pHash;
+                    int pNoise = (int)(pHash % 20) - 10;
+
+                    int base_r = 140 + bVar + pNoise;
+                    int base_g = 135 + bVar + pNoise;
+                    int base_b = 125 + bVar + pNoise;
+
+                    pixels[idx + 0] = (unsigned char)(base_r < 0 ? 0 : (base_r > 255 ? 255 : base_r));
+                    pixels[idx + 1] = (unsigned char)(base_g < 0 ? 0 : (base_g > 255 ? 255 : base_g));
+                    pixels[idx + 2] = (unsigned char)(base_b < 0 ? 0 : (base_b > 255 ? 255 : base_b));
+                }
+            }
+        }
+
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, TEX_SIZE, TEX_SIZE, 0,
+                     GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+    }
+
     glGenerateMipmap(GL_TEXTURE_2D);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
