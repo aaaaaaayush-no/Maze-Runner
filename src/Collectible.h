@@ -12,8 +12,7 @@ static constexpr float COLLECTIBLE_HALF_SIZE = COLLECTIBLE_SIZE * 0.5f;
 static constexpr float PICKUP_HALF_WIDTH  = 0.75f;  // XZ half-extent for pickup
 static constexpr float PICKUP_HALF_HEIGHT = 1.25f;  // Y half-extent for pickup
 
-// Carry behavior constants
-static constexpr float CARRY_DURATION        = 2.0f;   // Seconds before carried item is absorbed
+// Carry behavior constants (CARRY_FORWARD_OFFSET, Y_OFFSET, RIGHT_OFFSET define hand position)
 static constexpr float CARRY_FORWARD_OFFSET  = 0.8f;   // Units in front of player
 static constexpr float CARRY_Y_OFFSET        = -0.6f;   // Units below player eye level
 static constexpr float CARRY_RIGHT_OFFSET    = 0.3f;   // Units to the right of player
@@ -44,7 +43,10 @@ public:
     // AABB-based pickup: returns index of picked-up item, or -1 if none
     int tryPickup(const glm::vec3& playerPos, bool alreadyCarrying);
 
+    // Count of items grabbed (pickedUp OR deposited) – used for HUD progress display
     int getCollectedCount() const;
+    // Count of items actually deposited at the cauldron (collected=true)
+    int getDepositedCount() const;
     int getTotalCount() const;
     bool allCollected() const;
 

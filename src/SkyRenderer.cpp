@@ -42,7 +42,7 @@ SkyRenderer::SkyRenderer()
     , starVAO(0), starVBO(0)
     , skyVertexCount(0), starVertexCount(0)
     , skyShaderID(0)
-    , timeOfDay(0.0f)  // permanent midnight
+    , timeOfDay(0.0f)  // start at midnight
 {
 }
 
@@ -103,41 +103,102 @@ void SkyRenderer::init() {
     buildStarMesh();
 }
 
-void SkyRenderer::update(float /*dt*/) {
-    // Permanent night: no time advancement
+void SkyRenderer::update(float dt) {
+    timeOfDay += dt * DAY_CYCLE_SPEED;
+    if (timeOfDay >= 1.0f) timeOfDay -= 1.0f;
+}
+
+// Helper: smooth step between two values
+static float smoothLerp(float a, float b, float t) {
+    t = t * t * (3.0f - 2.0f * t); // smoothstep
+    return a + (b - a) * t;
+}
+
+// Helper: remap t from [inLo,inHi] to [0,1], clamped
+static float remap01(float t, float inLo, float inHi) {
+    if (inHi <= inLo) return 0.0f;
+    return std::max(0.0f, std::min(1.0f, (t - inLo) / (inHi - inLo)));
 }
 
 glm::vec3 SkyRenderer::getSkyTopColor() const {
-    // Permanent night sky: deep blue-black
-    return glm::vec3(0.02f, 0.02f, 0.08f);
+    float t = timeOfDay;
+    // Night:   0.0 – 0.20 and 0.85 – 1.0  → deep blue-black
+    // Sunrise: 0.20 – 0.30                → pink/purple
+    // Day:     0.30 – 0.70                → clear blue
+    // Sunset:  0.70 – 0.85                → orange/red
+
+    glm::vec3 night(0.02f, 0.02f, 0.08f);
+    glm::vec3 dawn(0.15f, 0.08f, 0.20f);
+    glm::vec3 day(0.18f, 0.40f, 0.80f);
+    glm::vec3 dusk(0.20f, 0.10f, 0.18f);
+
+    if (t < 0.20f || t >= 0.85f) return night;
+    if (t < 0.30f) return glm::mix(night, dawn, remap01(t, 0.20f, 0.30f));
+    if (t < 0.45f) return glm::mix(dawn, day,   remap01(t, 0.30f, 0.45f));
+    if (t < 0.70f) return day;
+    if (t < 0.85f) return glm::mix(day, dusk,   remap01(t, 0.70f, 0.85f));
+    return night;
 }
 
 glm::vec3 SkyRenderer::getSkyHorizonColor() const {
-    // Permanent night horizon: very dark blue
-    return glm::vec3(0.03f, 0.03f, 0.06f);
+    float t = timeOfDay;
+    glm::vec3 nightH(0.03f, 0.03f, 0.06f);
+    glm::vec3 sunriseH(0.90f, 0.45f, 0.15f);
+    glm::vec3 dayH(0.55f, 0.75f, 0.95f);
+    glm::vec3 sunsetH(0.95f, 0.35f, 0.10f);
+
+    if (t < 0.18f || t >= 0.88f) return nightH;
+    if (t < 0.30f) return glm::mix(nightH, sunriseH, remap01(t, 0.18f, 0.30f));
+    if (t < 0.45f) return glm::mix(sunriseH, dayH,   remap01(t, 0.30f, 0.45f));
+    if (t < 0.68f) return dayH;
+    if (t < 0.88f) return glm::mix(dayH, sunsetH,    remap01(t, 0.68f, 0.88f));
+    return nightH;
 }
 
 glm::vec3 SkyRenderer::getSunDirection() const {
-    // Permanent moon at high angle (near zenith)
-    float moonAngle = 0.5f * (float)M_PI; // moon at peak
-    float y = std::sin(moonAngle);
-    float xz = std::cos(moonAngle);
+    // Sun angle: rises at t=0.25, peaks at t=0.5, sets at t=0.75
+    // Moon is 0.5 phase shifted (night: t~0 or t~1)
+    float angle = (timeOfDay - 0.25f) * 2.0f * (float)M_PI;
+    float y  = std::sin(angle);
+    float xz = std::cos(angle);
     return glm::normalize(glm::vec3(xz * 0.7f, y, xz * 0.3f));
 }
 
 glm::vec3 SkyRenderer::getSunColor() const {
-    // Cool blue-white moonlight
-    return glm::vec3(0.55f, 0.6f, 0.8f);
+    float t = timeOfDay;
+    // Moonlight (night): cool blue-white
+    glm::vec3 moon(0.55f, 0.60f, 0.80f);
+    // Sunrise / sunset: warm orange
+    glm::vec3 sunRise(1.00f, 0.65f, 0.30f);
+    // Midday: bright white-yellow
+    glm::vec3 sunDay(1.00f, 0.95f, 0.80f);
+
+    if (t < 0.20f || t >= 0.85f) return moon;
+    if (t < 0.35f) return glm::mix(moon,    sunRise, remap01(t, 0.20f, 0.35f));
+    if (t < 0.50f) return glm::mix(sunRise, sunDay,  remap01(t, 0.35f, 0.50f));
+    if (t < 0.65f) return glm::mix(sunDay,  sunRise, remap01(t, 0.50f, 0.65f));
+    if (t < 0.85f) return glm::mix(sunRise, moon,    remap01(t, 0.65f, 0.85f));
+    return moon;
 }
 
 glm::vec3 SkyRenderer::getFogColor() const {
-    glm::vec3 horizon = getSkyHorizonColor();
-    return horizon * 0.5f + glm::vec3(0.01f);
+    return getSkyHorizonColor() * 0.8f + glm::vec3(0.01f);
 }
 
 float SkyRenderer::getAmbientLevel() const {
-    // Dim nighttime ambient: 0.15
-    return 0.15f;
+    float t = timeOfDay;
+    // Night: 0.08, dawn/dusk: 0.35, midday: 0.85
+    float night = 0.08f;
+    float transition = 0.35f;
+    float day = 0.85f;
+
+    if (t < 0.18f || t >= 0.88f) return night;
+    if (t < 0.32f) return smoothLerp(night,      transition, remap01(t, 0.18f, 0.32f));
+    if (t < 0.45f) return smoothLerp(transition, day,        remap01(t, 0.32f, 0.45f));
+    if (t < 0.60f) return day;
+    if (t < 0.72f) return smoothLerp(day,        transition, remap01(t, 0.60f, 0.72f));
+    if (t < 0.88f) return smoothLerp(transition, night,      remap01(t, 0.72f, 0.88f));
+    return night;
 }
 
 void SkyRenderer::buildSunMesh() {
@@ -335,127 +396,130 @@ void SkyRenderer::render(const glm::mat4& view, const glm::mat4& projection) {
     glDisable(GL_CULL_FACE);
     glDrawArrays(GL_TRIANGLES, 0, skyVertexCount);
 
-    // Render moon (permanent night)
+    // Render sun (daytime) or moon (nighttime)
     {
+        bool isDay = (timeOfDay > 0.22f && timeOfDay < 0.78f);
+
         glm::vec3 sunDir = getSunDirection();
-        glm::vec3 sunPos = sunDir * 80.0f;
-        float sunSize = 5.0f;
+        // Show only when above horizon
+        if (sunDir.y > -0.15f) {
+            glm::vec3 sunPos = sunDir * 80.0f;
+            float sunSize = isDay ? 6.0f : 5.0f;
 
-        // Moon color: pale blue-white
-        glm::vec3 bodyColor(0.8f, 0.85f, 0.95f);
+            // Sun: bright yellow, Moon: pale blue-white
+            glm::vec3 bodyColor = isDay
+                ? glm::vec3(1.0f, 0.92f, 0.4f)
+                : glm::vec3(0.80f, 0.85f, 0.95f);
 
-        // Billboard matrix: moon always faces camera
-        glm::mat4 sunModel = glm::translate(glm::mat4(1.0f), sunPos);
-        // Extract rotation from skyView and apply inverse
-        glm::mat3 rot = glm::mat3(skyView);
-        glm::mat3 invRot = glm::transpose(rot);
-        sunModel = sunModel * glm::mat4(invRot);
-        sunModel = glm::scale(sunModel, glm::vec3(sunSize));
+            // Fade near horizon
+            float horizonFade = std::min(1.0f, (sunDir.y + 0.15f) / 0.3f);
 
-        glm::mat4 sunVP = projection * skyView * sunModel;
-        glUniformMatrix4fv(vpLoc, 1, GL_FALSE, &sunVP[0][0]);
+            glm::mat4 sunModel = glm::translate(glm::mat4(1.0f), sunPos);
+            glm::mat3 rot = glm::mat3(skyView);
+            glm::mat3 invRot = glm::transpose(rot);
+            sunModel = sunModel * glm::mat4(invRot);
+            sunModel = glm::scale(sunModel, glm::vec3(sunSize));
 
-        // Build pixelated moon mesh
-        std::vector<float> sunVerts;
-        float bSize = 0.3f;
-        // Center block (3x3 grid of small squares for blocky look)
-        for (int bx = -1; bx <= 1; bx++) {
-            for (int by = -1; by <= 1; by++) {
-                float ox = bx * bSize * 2.0f;
-                float oy = by * bSize * 2.0f;
-                float cr = bodyColor.r;
-                float cg = bodyColor.g;
-                float cb = bodyColor.b;
-                // Slightly vary corner blocks for pixel texture
-                if (std::abs(bx) + std::abs(by) == 2) {
-                    cr *= 0.85f; cg *= 0.85f; cb *= 0.85f;
+            glm::mat4 sunVP = projection * skyView * sunModel;
+            glUniformMatrix4fv(vpLoc, 1, GL_FALSE, &sunVP[0][0]);
+
+            // Build pixelated disc mesh
+            std::vector<float> sunVerts;
+            float bSize = 0.3f;
+            for (int bx = -1; bx <= 1; bx++) {
+                for (int by = -1; by <= 1; by++) {
+                    float ox = bx * bSize * 2.0f;
+                    float oy = by * bSize * 2.0f;
+                    float cr = bodyColor.r * horizonFade;
+                    float cg = bodyColor.g * horizonFade;
+                    float cb = bodyColor.b * horizonFade;
+                    if (std::abs(bx) + std::abs(by) == 2) {
+                        cr *= 0.85f; cg *= 0.85f; cb *= 0.85f;
+                    }
+                    sunVerts.insert(sunVerts.end(), {ox - bSize, oy - bSize, 0.0f, cr, cg, cb});
+                    sunVerts.insert(sunVerts.end(), {ox + bSize, oy - bSize, 0.0f, cr, cg, cb});
+                    sunVerts.insert(sunVerts.end(), {ox + bSize, oy + bSize, 0.0f, cr, cg, cb});
+                    sunVerts.insert(sunVerts.end(), {ox - bSize, oy - bSize, 0.0f, cr, cg, cb});
+                    sunVerts.insert(sunVerts.end(), {ox + bSize, oy + bSize, 0.0f, cr, cg, cb});
+                    sunVerts.insert(sunVerts.end(), {ox - bSize, oy + bSize, 0.0f, cr, cg, cb});
                 }
-
-                sunVerts.insert(sunVerts.end(), {ox - bSize, oy - bSize, 0.0f, cr, cg, cb});
-                sunVerts.insert(sunVerts.end(), {ox + bSize, oy - bSize, 0.0f, cr, cg, cb});
-                sunVerts.insert(sunVerts.end(), {ox + bSize, oy + bSize, 0.0f, cr, cg, cb});
-                sunVerts.insert(sunVerts.end(), {ox - bSize, oy - bSize, 0.0f, cr, cg, cb});
-                sunVerts.insert(sunVerts.end(), {ox + bSize, oy + bSize, 0.0f, cr, cg, cb});
-                sunVerts.insert(sunVerts.end(), {ox - bSize, oy + bSize, 0.0f, cr, cg, cb});
             }
-        }
-
-        // Extra edge blocks for rounded pixel moon shape
-        float ecr = bodyColor.r * 0.9f;
-        float ecg = bodyColor.g * 0.9f;
-        float ecb = bodyColor.b * 0.9f;
-        for (int d = -1; d <= 1; d += 2) {
-            // Top/bottom extensions
-            float ox = 0.0f;
-            float oy = d * bSize * 4.0f;
-            sunVerts.insert(sunVerts.end(), {ox - bSize, oy - bSize, 0.0f, ecr, ecg, ecb});
-            sunVerts.insert(sunVerts.end(), {ox + bSize, oy - bSize, 0.0f, ecr, ecg, ecb});
-            sunVerts.insert(sunVerts.end(), {ox + bSize, oy + bSize, 0.0f, ecr, ecg, ecb});
-            sunVerts.insert(sunVerts.end(), {ox - bSize, oy - bSize, 0.0f, ecr, ecg, ecb});
-            sunVerts.insert(sunVerts.end(), {ox + bSize, oy + bSize, 0.0f, ecr, ecg, ecb});
-            sunVerts.insert(sunVerts.end(), {ox - bSize, oy + bSize, 0.0f, ecr, ecg, ecb});
-
-            // Left/right extensions
-            ox = d * bSize * 4.0f;
-            oy = 0.0f;
-            sunVerts.insert(sunVerts.end(), {ox - bSize, oy - bSize, 0.0f, ecr, ecg, ecb});
-            sunVerts.insert(sunVerts.end(), {ox + bSize, oy - bSize, 0.0f, ecr, ecg, ecb});
-            sunVerts.insert(sunVerts.end(), {ox + bSize, oy + bSize, 0.0f, ecr, ecg, ecb});
-            sunVerts.insert(sunVerts.end(), {ox - bSize, oy - bSize, 0.0f, ecr, ecg, ecb});
-            sunVerts.insert(sunVerts.end(), {ox + bSize, oy + bSize, 0.0f, ecr, ecg, ecb});
-            sunVerts.insert(sunVerts.end(), {ox - bSize, oy + bSize, 0.0f, ecr, ecg, ecb});
-        }
-
-        int sunVCount = (int)(sunVerts.size() / 6);
-
-        glBindVertexArray(sunVAO);
-        glBindBuffer(GL_ARRAY_BUFFER, sunVBO);
-        glBufferData(GL_ARRAY_BUFFER, sunVerts.size() * sizeof(float), sunVerts.data(), GL_DYNAMIC_DRAW);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
-        glEnableVertexAttribArray(1);
-
-        glDrawArrays(GL_TRIANGLES, 0, sunVCount);
-
-        // Render moonlight glow halo
-        {
-            std::vector<float> glowVerts;
-            int glowSegments = 16;
-            float glowRadius = bSize * 8.0f;
-            glm::vec3 glowCol = bodyColor * 0.3f; // soft glow
-
-            for (int seg = 0; seg < glowSegments; seg++) {
-                float a0 = 2.0f * (float)M_PI * seg / glowSegments;
-                float a1 = 2.0f * (float)M_PI * (seg + 1) / glowSegments;
-
-                // Center vertex (brighter)
-                glowVerts.insert(glowVerts.end(), {0.0f, 0.0f, 0.0f,
-                    bodyColor.r * 0.5f, bodyColor.g * 0.5f, bodyColor.b * 0.5f});
-                // Outer vertices (faded)
-                glowVerts.insert(glowVerts.end(), {glowRadius * std::cos(a0), glowRadius * std::sin(a0), 0.0f,
-                    glowCol.r, glowCol.g, glowCol.b});
-                glowVerts.insert(glowVerts.end(), {glowRadius * std::cos(a1), glowRadius * std::sin(a1), 0.0f,
-                    glowCol.r, glowCol.g, glowCol.b});
+            float ecr = bodyColor.r * horizonFade * 0.9f;
+            float ecg = bodyColor.g * horizonFade * 0.9f;
+            float ecb = bodyColor.b * horizonFade * 0.9f;
+            for (int d = -1; d <= 1; d += 2) {
+                float ox = 0.0f, oy = d * bSize * 4.0f;
+                sunVerts.insert(sunVerts.end(), {ox - bSize, oy - bSize, 0.0f, ecr, ecg, ecb});
+                sunVerts.insert(sunVerts.end(), {ox + bSize, oy - bSize, 0.0f, ecr, ecg, ecb});
+                sunVerts.insert(sunVerts.end(), {ox + bSize, oy + bSize, 0.0f, ecr, ecg, ecb});
+                sunVerts.insert(sunVerts.end(), {ox - bSize, oy - bSize, 0.0f, ecr, ecg, ecb});
+                sunVerts.insert(sunVerts.end(), {ox + bSize, oy + bSize, 0.0f, ecr, ecg, ecb});
+                sunVerts.insert(sunVerts.end(), {ox - bSize, oy + bSize, 0.0f, ecr, ecg, ecb});
+                ox = d * bSize * 4.0f; oy = 0.0f;
+                sunVerts.insert(sunVerts.end(), {ox - bSize, oy - bSize, 0.0f, ecr, ecg, ecb});
+                sunVerts.insert(sunVerts.end(), {ox + bSize, oy - bSize, 0.0f, ecr, ecg, ecb});
+                sunVerts.insert(sunVerts.end(), {ox + bSize, oy + bSize, 0.0f, ecr, ecg, ecb});
+                sunVerts.insert(sunVerts.end(), {ox - bSize, oy - bSize, 0.0f, ecr, ecg, ecb});
+                sunVerts.insert(sunVerts.end(), {ox + bSize, oy + bSize, 0.0f, ecr, ecg, ecb});
+                sunVerts.insert(sunVerts.end(), {ox - bSize, oy + bSize, 0.0f, ecr, ecg, ecb});
             }
 
-            int glowVCount = (int)(glowVerts.size() / 6);
+            int sunVCount = (int)(sunVerts.size() / 6);
+            glBindVertexArray(sunVAO);
             glBindBuffer(GL_ARRAY_BUFFER, sunVBO);
-            glBufferData(GL_ARRAY_BUFFER, glowVerts.size() * sizeof(float), glowVerts.data(), GL_DYNAMIC_DRAW);
+            glBufferData(GL_ARRAY_BUFFER, sunVerts.size() * sizeof(float), sunVerts.data(), GL_DYNAMIC_DRAW);
             glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
             glEnableVertexAttribArray(0);
             glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
             glEnableVertexAttribArray(1);
+            glDrawArrays(GL_TRIANGLES, 0, sunVCount);
 
-            glDrawArrays(GL_TRIANGLES, 0, glowVCount);
+            // Glow halo
+            {
+                std::vector<float> glowVerts;
+                int glowSegments = 16;
+                float glowRadius = bSize * 8.0f;
+                float glowAlpha = horizonFade * (isDay ? 0.5f : 0.3f);
+                glm::vec3 glowCol = bodyColor * glowAlpha;
+
+                for (int seg = 0; seg < glowSegments; seg++) {
+                    float a0 = 2.0f * (float)M_PI * seg / glowSegments;
+                    float a1 = 2.0f * (float)M_PI * (seg + 1) / glowSegments;
+                    glowVerts.insert(glowVerts.end(), {0.0f, 0.0f, 0.0f,
+                        bodyColor.r * horizonFade * 0.5f, bodyColor.g * horizonFade * 0.5f, bodyColor.b * horizonFade * 0.5f});
+                    glowVerts.insert(glowVerts.end(), {glowRadius * std::cos(a0), glowRadius * std::sin(a0), 0.0f,
+                        glowCol.r, glowCol.g, glowCol.b});
+                    glowVerts.insert(glowVerts.end(), {glowRadius * std::cos(a1), glowRadius * std::sin(a1), 0.0f,
+                        glowCol.r, glowCol.g, glowCol.b});
+                }
+                int glowVCount = (int)(glowVerts.size() / 6);
+                glBindBuffer(GL_ARRAY_BUFFER, sunVBO);
+                glBufferData(GL_ARRAY_BUFFER, glowVerts.size() * sizeof(float), glowVerts.data(), GL_DYNAMIC_DRAW);
+                glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+                glEnableVertexAttribArray(0);
+                glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+                glEnableVertexAttribArray(1);
+                glDrawArrays(GL_TRIANGLES, 0, glowVCount);
+            }
         }
     }
 
-    // Render stars
+    // Render stars – only visible at night, fade during dawn/dusk
     if (starVAO && starVertexCount > 0) {
-        glUniformMatrix4fv(vpLoc, 1, GL_FALSE, &viewProj[0][0]);
-        glBindVertexArray(starVAO);
-        glDrawArrays(GL_TRIANGLES, 0, starVertexCount);
+        // Compute star brightness: 1.0 at night, 0.0 during full day
+        float starBrightness = 0.0f;
+        float t = timeOfDay;
+        if (t < 0.18f || t >= 0.88f) starBrightness = 1.0f;
+        else if (t < 0.30f) starBrightness = 1.0f - remap01(t, 0.18f, 0.30f);
+        else if (t >= 0.78f && t < 0.88f) starBrightness = remap01(t, 0.78f, 0.88f);
+
+        if (starBrightness > 0.01f) {
+            // Temporarily scale star colors by brightness
+            // We pass the regular viewProj – star fade is approximate (they just disappear)
+            glUniformMatrix4fv(vpLoc, 1, GL_FALSE, &viewProj[0][0]);
+            glBindVertexArray(starVAO);
+            glDrawArrays(GL_TRIANGLES, 0, starVertexCount);
+        }
     }
 
     glDepthMask(GL_TRUE);
