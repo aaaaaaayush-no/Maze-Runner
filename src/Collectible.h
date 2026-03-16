@@ -5,7 +5,7 @@
 #include <vector>
 
 // Collectable box dimensions in world units
-static constexpr float COLLECTIBLE_SIZE      = 0.5f;
+static constexpr float COLLECTIBLE_SIZE      = 0.3f;
 static constexpr float COLLECTIBLE_HALF_SIZE = COLLECTIBLE_SIZE * 0.5f;
 
 // AABB pickup range (generous, similar feel to old sphere radius 1.5)
