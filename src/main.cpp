@@ -41,6 +41,7 @@ static bool keySpace = false;
 static bool requestRestart = false;
 static bool requestWireToggle = false;
 static bool requestTorchToggle = false;
+static bool requestTPPToggle = false;
 
 static Difficulty currentDifficulty = Difficulty::MEDIUM;
 static GameScreen currentScreen = GameScreen::TITLE_SCREEN;
@@ -354,6 +355,7 @@ static void keyCallback(GLFWwindow* window, int key, int /*scancode*/, int actio
         case GLFW_KEY_R:  if (down) requestRestart = true; break;
         case GLFW_KEY_F1: if (down) requestWireToggle = true; break;
         case GLFW_KEY_T:  if (down) requestTorchToggle = true; break;
+        case GLFW_KEY_V:  if (down) requestTPPToggle = true; break;
         case GLFW_KEY_ESCAPE:
             if (currentScreen == GameScreen::PLAYING) {
                 currentScreen = GameScreen::TITLE_SCREEN;
@@ -560,6 +562,10 @@ int main() {
             torchLight.toggle();
             requestTorchToggle = false;
         }
+        if (requestTPPToggle) {
+            game.player.thirdPerson = !game.player.thirdPerson;
+            requestTPPToggle = false;
+        }
 
         // Fixed timestep physics
         if (!game.won) {
@@ -578,53 +584,50 @@ int main() {
         torchLight.update(frameTime);
         torchLight.setPlayerPosition(game.player.position, game.player.getFront());
 
-        // Try collecting items via AABB pickup (one at a time)
+        // Try collecting items via AABB pickup (stackable – allow multiple)
         {
-            int idx = game.collectibles.tryPickup(
-                game.player.position, game.player.isCarrying);
+            int idx = game.collectibles.tryPickup(game.player.position, false);
             if (idx >= 0) {
-                // Pick up the item: start carrying it
-                game.player.isCarrying = true;
-                game.player.carriedItemIndex = idx;
-                game.player.carryTimer = 0.0f;
-            }
-
-            // Update carry timer: auto-absorb after CARRY_DURATION
-            if (game.player.isCarrying) {
-                game.player.carryTimer += frameTime;
-                if (game.player.carryTimer >= CARRY_DURATION) {
-                    game.player.isCarrying = false;
-                    game.player.carriedItemIndex = -1;
-                }
+                game.player.carriedItems.push_back(idx);
             }
         }
 
-        // Check win condition
-        if (!game.won && game.collectibles.allCollected()) {
-            float dist = glm::length(game.player.position - game.exitWorldPos);
-            if (dist < 2.0f) {
-                game.won = true;
-                game.winScreenStartTime = currentTime;
-
-                // Calculate stars
-                bool allCollected = game.collectibles.allCollected();
-                game.starResult = calculateStars(currentDifficulty,
-                                                 game.elapsedTime, allCollected);
-
-                // Save highscore
-                if (!game.scoreSaved) {
-                    HighscoreEntry entry;
-                    entry.name = "Player";
-                    entry.score = std::max(1, (int)(10000.0f / (game.elapsedTime + 1.0f)));
-                    entry.time = game.elapsedTime;
-                    entry.difficulty = (int)currentDifficulty;
-                    entry.collectables = game.collectibles.getCollectedCount();
-                    entry.stars = game.starResult.stars;
-                    entry.perfectRun = game.starResult.perfectRun ? 1 : 0;
-                    addHighscore(HIGHSCORE_FILE, entry);
-                    highscores = loadHighscores(HIGHSCORE_FILE);
-                    game.scoreSaved = true;
+        // Auto-deposit carried items when near the cauldron
+        float distToCauldron = glm::length(game.player.position - game.exitWorldPos);
+        bool nearCauldron = (distToCauldron < 2.0f);
+        if (nearCauldron && !game.player.carriedItems.empty()) {
+            auto& items = game.collectibles.getItemsMut();
+            for (int idx : game.player.carriedItems) {
+                if (idx >= 0 && idx < (int)items.size()) {
+                    items[idx].pickedUp  = false;
+                    items[idx].collected = true;
                 }
+            }
+            game.player.carriedItems.clear();
+        }
+
+        // Check win condition: all items deposited AND at cauldron
+        if (!game.won && game.collectibles.allCollected() && nearCauldron) {
+            game.won = true;
+            game.winScreenStartTime = currentTime;
+
+            // Calculate stars
+            game.starResult = calculateStars(currentDifficulty,
+                                             game.elapsedTime, true);
+
+            // Save highscore
+            if (!game.scoreSaved) {
+                HighscoreEntry entry;
+                entry.name = "Player";
+                entry.score = std::max(1, (int)(10000.0f / (game.elapsedTime + 1.0f)));
+                entry.time = game.elapsedTime;
+                entry.difficulty = (int)currentDifficulty;
+                entry.collectables = game.collectibles.getDepositedCount();
+                entry.stars = game.starResult.stars;
+                entry.perfectRun = game.starResult.perfectRun ? 1 : 0;
+                addHighscore(HIGHSCORE_FILE, entry);
+                highscores = loadHighscores(HIGHSCORE_FILE);
+                game.scoreSaved = true;
             }
         }
 
@@ -677,17 +680,17 @@ int main() {
                                           sunDir, sunColor, ambientLevel, fogCol,
                                           torchOn, torchPos, torchCol, torchRadius);
 
-        // Exit portal
-        game.renderer.renderExitPortal(mainShader, view, projection,
-                                        game.exitWorldPos, currentTime,
-                                        sunDir, sunColor, ambientLevel, fogCol,
-                                        torchOn, torchPos, torchCol, torchRadius);
+        // Cauldron (replaces exit portal)
+        game.renderer.renderCauldron(mainShader, view, projection,
+                                     game.exitWorldPos, currentTime,
+                                     sunDir, sunColor, ambientLevel, fogCol,
+                                     torchOn, torchPos, torchCol, torchRadius);
 
         // Torch glow sprite
         torchLight.renderGlow(mainShader, view, projection);
 
-        // Update and render first-person hands
-        {
+        // Update and render first-person hands (only in FPP)
+        if (!game.player.thirdPerson) {
             bool isMoving = keyW || keyA || keyS || keyD;
             bool isJumping = !game.player.isOnGround();
             bool isMovingBack = keyS && !keyW;
@@ -695,20 +698,28 @@ int main() {
             handRenderer.render(mainShader, aspect);
         }
 
-        // Render carried collectible on top of player (after hands for visibility)
-        if (game.player.isCarrying &&
-            game.player.carriedItemIndex >= 0 &&
-            game.player.carriedItemIndex < (int)game.collectibles.getItems().size()) {
+        // Render player model in third-person view
+        if (game.player.thirdPerson) {
+            game.renderer.renderPlayer(
+                mainShader, view, projection,
+                game.player.position, game.player.yaw,
+                sunDir, sunColor, ambientLevel, fogCol,
+                torchOn, torchPos, torchCol, torchRadius);
+        }
+
+        // Render carried collectibles stacked in the player's hands
+        if (!game.player.carriedItems.empty()) {
             game.renderer.renderCarriedCollectible(
                 mainShader, view, projection,
                 game.player.position, game.player.getFront(),
+                (int)game.player.carriedItems.size(),
                 sunDir, sunColor, ambientLevel, fogCol,
                 torchOn, torchPos, torchCol, torchRadius);
         }
 
         // HUD text
         {
-            // Item counter
+            // Item counter (grabbed or deposited / total)
             char buf[64];
             std::snprintf(buf, sizeof(buf), "%d/%d",
                           game.collectibles.getCollectedCount(),
@@ -718,13 +729,23 @@ int main() {
                            1.0f, 0.84f, 0.0f,
                            screenWidth, screenHeight);
 
+            // Stack count (items currently in hand)
+            int stackSize = (int)game.player.carriedItems.size();
+            if (stackSize > 0) {
+                std::snprintf(buf, sizeof(buf), "HOLD %d", stackSize);
+                hud.renderText(hudShader, buf,
+                               20, (float)screenHeight - 70, 12, 18,
+                               0.3f, 1.0f, 0.5f,
+                               screenWidth, screenHeight);
+            }
+
             // Timer
             int totalSec = (int)game.elapsedTime;
             int mins = totalSec / 60;
             int secs = totalSec % 60;
             std::snprintf(buf, sizeof(buf), "%02d:%02d", mins, secs);
             hud.renderText(hudShader, buf,
-                           20, (float)screenHeight - 80, 16, 24,
+                           20, (float)screenHeight - 100, 16, 24,
                            1.0f, 1.0f, 1.0f,
                            screenWidth, screenHeight);
 
@@ -732,9 +753,17 @@ int main() {
             auto cfg = getDifficultyConfig(currentDifficulty);
             std::snprintf(buf, sizeof(buf), "%s", cfg.name);
             hud.renderText(hudShader, buf,
-                           20, (float)screenHeight - 120, 12, 18,
+                           20, (float)screenHeight - 130, 12, 18,
                            0.6f, 0.6f, 0.8f,
                            screenWidth, screenHeight);
+
+            // TPP mode indicator
+            if (game.player.thirdPerson) {
+                hud.renderText(hudShader, "TPP",
+                               (float)screenWidth - 80, (float)screenHeight - 40, 12, 18,
+                               0.8f, 0.8f, 0.2f,
+                               screenWidth, screenHeight);
+            }
 
             // Star preview per difficulty (bottom-left)
             float previewY = 30.0f;

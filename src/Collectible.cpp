@@ -48,9 +48,8 @@ bool Collectible::tryCollect(const glm::vec3& playerPos, float radius) {
 }
 
 // AABB overlap pickup: returns index of first overlapping uncollected item, or -1
-int Collectible::tryPickup(const glm::vec3& playerPos, bool alreadyCarrying) {
-    if (alreadyCarrying) return -1; // Can't pick up while already carrying
-
+int Collectible::tryPickup(const glm::vec3& playerPos, bool /*alreadyCarrying*/) {
+    // Always allow pickup regardless of carry state (stackable items)
     for (int i = 0; i < (int)items.size(); i++) {
         auto& item = items[i];
         if (item.collected || item.pickedUp) continue;
@@ -63,10 +62,9 @@ int Collectible::tryPickup(const glm::vec3& playerPos, bool alreadyCarrying) {
         if (dx < PICKUP_HALF_WIDTH &&
             dy < PICKUP_HALF_HEIGHT &&
             dz < PICKUP_HALF_WIDTH) {
-            // Mark as both picked up (carried) and collected (counts toward total)
-            // so the win condition (allCollected) works immediately on pickup
+            // Mark as picked up (carried), but NOT collected yet.
+            // Items become "collected" only when deposited at the cauldron.
             item.pickedUp = true;
-            item.collected = true;
             return i;
         }
     }
@@ -74,6 +72,15 @@ int Collectible::tryPickup(const glm::vec3& playerPos, bool alreadyCarrying) {
 }
 
 int Collectible::getCollectedCount() const {
+    // Counts items that have been grabbed (carried) OR deposited at the cauldron,
+    // useful for the HUD progress counter.
+    int count = 0;
+    for (auto& item : items)
+        if (item.collected || item.pickedUp) count++;
+    return count;
+}
+
+int Collectible::getDepositedCount() const {
     int count = 0;
     for (auto& item : items)
         if (item.collected) count++;
@@ -85,5 +92,9 @@ int Collectible::getTotalCount() const {
 }
 
 bool Collectible::allCollected() const {
-    return getCollectedCount() == getTotalCount() && getTotalCount() > 0;
+    // All items must be deposited (collected=true) for win condition
+    if (getTotalCount() == 0) return false;
+    for (auto& item : items)
+        if (!item.collected) return false;
+    return true;
 }

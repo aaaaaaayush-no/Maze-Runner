@@ -44,7 +44,10 @@ public:
     // AABB-based pickup: returns index of picked-up item, or -1 if none
     int tryPickup(const glm::vec3& playerPos, bool alreadyCarrying);
 
+    // Count of items grabbed (pickedUp OR deposited) – used for HUD progress display
     int getCollectedCount() const;
+    // Count of items actually deposited at the cauldron (collected=true)
+    int getDepositedCount() const;
     int getTotalCount() const;
     bool allCollected() const;
 
