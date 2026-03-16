@@ -596,8 +596,9 @@ int main() {
         }
 
         // Auto-deliver carried items when entering the exit zone
+        // Exit zone is defined by the large platform (6x6 units)
         float distToExit = glm::length(game.player.position - game.exitWorldPos);
-        bool inExitZone = (distToExit < 2.5f);  // Slightly larger radius for open area feel
+        bool inExitZone = (distToExit < 3.0f);  // Exit zone radius matches platform size
         if (inExitZone && !game.player.carriedItems.empty()) {
             // Count delivered boxes
             game.boxesDelivered += (int)game.player.carriedItems.size();
@@ -613,7 +614,8 @@ int main() {
             game.player.carriedItems.clear();
         }
 
-        // Check win condition: player enters exit zone (regardless of boxes collected)
+        // Check win condition: player crosses boundary into the infinite outside world
+        // When player enters the exit zone, they have escaped the maze
         if (!game.won && inExitZone) {
             game.won = true;
             game.winScreenStartTime = currentTime;
