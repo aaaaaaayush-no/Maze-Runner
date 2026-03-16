@@ -26,6 +26,7 @@ Renderer::Renderer()
     , cubeVAO(0), cubeVBO(0), cubeVertexCount(0)
     , pyramidVAO(0), pyramidVBO(0), pyramidVertexCount(0)
     , sphereVAO(0), sphereVBO(0), sphereVertexCount(0)
+    , giftBoxVAO(0), giftBoxVBO(0), giftBoxVertexCount(0), giftBoxTextureID(0)
     , wallTextureID(0)
     , graffitiVAO(0), graffitiVBO(0), graffitiVertexCount(0)
     , wireframe(false)
@@ -37,6 +38,8 @@ Renderer::~Renderer() {
     if (cubeVAO) { glDeleteVertexArrays(1, &cubeVAO); glDeleteBuffers(1, &cubeVBO); }
     if (pyramidVAO) { glDeleteVertexArrays(1, &pyramidVAO); glDeleteBuffers(1, &pyramidVBO); }
     if (sphereVAO) { glDeleteVertexArrays(1, &sphereVAO); glDeleteBuffers(1, &sphereVBO); }
+    if (giftBoxVAO) { glDeleteVertexArrays(1, &giftBoxVAO); glDeleteBuffers(1, &giftBoxVBO); }
+    if (giftBoxTextureID) { glDeleteTextures(1, &giftBoxTextureID); }
     if (wallTextureID) { glDeleteTextures(1, &wallTextureID); }
     if (graffitiVAO) { glDeleteVertexArrays(1, &graffitiVAO); glDeleteBuffers(1, &graffitiVBO); }
     for (auto id : graffitiTextureIDs) {
@@ -46,10 +49,12 @@ Renderer::~Renderer() {
 
 void Renderer::init() {
     generateWallTexture();
+    generateGiftBoxTexture();
     generateGraffitiTextures();
     buildCubeMesh();
     buildPyramidMesh();
     buildSphereMesh();
+    buildGiftBoxMesh();
 }
 
 void Renderer::setWireframe(bool enabled) {
@@ -338,6 +343,102 @@ void Renderer::generateWallTexture() {
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
+void Renderer::generateGiftBoxTexture() {
+    glGenTextures(1, &giftBoxTextureID);
+    glBindTexture(GL_TEXTURE_2D, giftBoxTextureID);
+
+    // Try loading an external texture from textures/gift_box.png
+    int imgW, imgH, imgChannels;
+    unsigned char* data = stbi_load("textures/gift_box.png", &imgW, &imgH, &imgChannels, 4);
+    if (data) {
+        std::cerr << "Loaded gift box texture from textures/gift_box.png ("
+                  << imgW << "x" << imgH << ")\n";
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, imgW, imgH, 0,
+                     GL_RGBA, GL_UNSIGNED_BYTE, data);
+        stbi_image_free(data);
+    } else {
+        std::cerr << "textures/gift_box.png not found, using procedural texture\n";
+
+        // Procedural gift box texture: red box with gold ribbon cross
+        const int TEX_SIZE = 64;
+        std::vector<unsigned char> pixels(TEX_SIZE * TEX_SIZE * 4);
+
+        const int ribbonWidth = 3;
+        const int center = TEX_SIZE / 2;
+
+        for (int y = 0; y < TEX_SIZE; y++) {
+            for (int x = 0; x < TEX_SIZE; x++) {
+                int idx = (y * TEX_SIZE + x) * 4;
+                unsigned char r = 200, g = 50, b = 50, a = 255;
+
+                // Highlight on top third
+                if (y < TEX_SIZE / 3) { r = 230; g = 80; b = 80; }
+                // Shadow on bottom third
+                else if (y > TEX_SIZE * 2 / 3) { r = 150; g = 35; b = 35; }
+
+                // Gold ribbon: horizontal band
+                if (std::abs(y - center) <= ribbonWidth) { r = 255; g = 215; b = 0; }
+                // Gold ribbon: vertical band
+                if (std::abs(x - center) <= ribbonWidth) { r = 255; g = 215; b = 0; }
+
+                // Bow at center intersection
+                int dx = x - center;
+                int dy = y - center;
+                if (std::abs(dx) < ribbonWidth * 3 && std::abs(dy) < ribbonWidth * 2) {
+                    if (std::abs(dx) + (int)(std::abs(dy) * 1.5f) < ribbonWidth * 4) {
+                        r = 255; g = 235; b = 50;
+                    }
+                }
+
+                // Dark border
+                if (x <= 1 || x >= TEX_SIZE - 2 || y <= 1 || y >= TEX_SIZE - 2) {
+                    r = 100; g = 25; b = 25;
+                }
+
+                pixels[idx + 0] = r;
+                pixels[idx + 1] = g;
+                pixels[idx + 2] = b;
+                pixels[idx + 3] = a;
+            }
+        }
+
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, TEX_SIZE, TEX_SIZE, 0,
+                     GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+    }
+
+    glGenerateMipmap(GL_TEXTURE_2D);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void Renderer::buildGiftBoxMesh() {
+    // Textured unit cube from (-0.5,-0.5,-0.5) to (0.5,0.5,0.5)
+    // Vertex format: pos(3) + color(3) + normal(3) + texcoord(2) = 11 floats
+    std::vector<float> verts;
+    addCubeTextured(verts, -0.5f, -0.5f, -0.5f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+    giftBoxVertexCount = (int)(verts.size() / 11);
+
+    glGenVertexArrays(1, &giftBoxVAO);
+    glGenBuffers(1, &giftBoxVBO);
+    glBindVertexArray(giftBoxVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, giftBoxVBO);
+    glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(float), verts.data(), GL_STATIC_DRAW);
+
+    // Same vertex layout as maze mesh (11-float stride)
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(float), (void*)(6 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, 11 * sizeof(float), (void*)(9 * sizeof(float)));
+    glEnableVertexAttribArray(3);
+
+    glBindVertexArray(0);
+}
 void Renderer::generateGraffitiTextures() {
     // Try loading external graffiti textures from textures/graffiti/
     for (const auto& filename : GRAFFITI_FILES) {
@@ -887,37 +988,71 @@ void Renderer::renderCollectibles(Shader& shader, const glm::mat4& view,
     shader.setMat4("projection", projection);
     setLightingUniforms(shader, sunDir, sunColor, ambientLevel, fogCol,
                         torchEnabled, torchPos, torchColor, torchRadius);
-    shader.setBool("useTexture", false);
+
+    // All collectables use the gift box texture and rectangular mesh
+    shader.setBool("useTexture", true);
     shader.setBool("enableEdgeOutline", false);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, giftBoxTextureID);
+    shader.setInt("wallTexture", 0);
 
     for (auto& item : items) {
-        if (item.collected) continue;
+        // Skip collected or picked-up items (no longer in the world)
+        if (item.collected || item.pickedUp) continue;
 
         glm::mat4 model = glm::translate(glm::mat4(1.0f), item.position);
         model = glm::rotate(model, glm::radians(item.rotationAngle), glm::vec3(0, 1, 0));
 
         float bob = sin(item.rotationAngle * 0.03f) * 0.15f;
         model = glm::translate(model, glm::vec3(0, bob, 0));
-        model = glm::scale(model, glm::vec3(0.5f));
+        model = glm::scale(model, glm::vec3(COLLECTIBLE_SIZE));
 
         shader.setMat4("model", model);
 
-        switch (item.type) {
-            case ItemType::KEY:
-                glBindVertexArray(cubeVAO);
-                glDrawArrays(GL_TRIANGLES, 0, cubeVertexCount);
-                break;
-            case ItemType::ARTIFACT:
-                glBindVertexArray(pyramidVAO);
-                glDrawArrays(GL_TRIANGLES, 0, pyramidVertexCount);
-                break;
-            case ItemType::ORB:
-                glBindVertexArray(sphereVAO);
-                glDrawArrays(GL_TRIANGLES, 0, sphereVertexCount);
-                break;
-        }
+        // Render as textured gift box (axis-aligned rectangle/box)
+        glBindVertexArray(giftBoxVAO);
+        glDrawArrays(GL_TRIANGLES, 0, giftBoxVertexCount);
         glBindVertexArray(0);
     }
+}
+
+void Renderer::renderCarriedCollectible(Shader& shader, const glm::mat4& view,
+                                        const glm::mat4& projection,
+                                        const glm::vec3& playerPos,
+                                        const glm::vec3& playerFront,
+                                        const glm::vec3& sunDir, const glm::vec3& sunColor,
+                                        float ambientLevel, const glm::vec3& fogCol,
+                                        bool torchEnabled, const glm::vec3& torchPos,
+                                        const glm::vec3& torchColor, float torchRadius) {
+    shader.use();
+    shader.setMat4("view", view);
+    shader.setMat4("projection", projection);
+    setLightingUniforms(shader, sunDir, sunColor, ambientLevel, fogCol,
+                        torchEnabled, torchPos, torchColor, torchRadius);
+
+    // Use gift box texture
+    shader.setBool("useTexture", true);
+    shader.setBool("enableEdgeOutline", false);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, giftBoxTextureID);
+    shader.setInt("wallTexture", 0);
+
+    // Compute carried position: offset from player in front, below eye level, to the right
+    glm::vec3 flatFront = glm::normalize(glm::vec3(playerFront.x, 0.0f, playerFront.z));
+    glm::vec3 right = glm::normalize(glm::cross(flatFront, glm::vec3(0.0f, 1.0f, 0.0f)));
+    glm::vec3 carriedPos = playerPos
+                         + flatFront * CARRY_FORWARD_OFFSET
+                         + right * CARRY_RIGHT_OFFSET
+                         + glm::vec3(0.0f, CARRY_Y_OFFSET, 0.0f);
+
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), carriedPos);
+    model = glm::scale(model, glm::vec3(COLLECTIBLE_SIZE));
+    shader.setMat4("model", model);
+
+    // Render carried gift box on top of the player
+    glBindVertexArray(giftBoxVAO);
+    glDrawArrays(GL_TRIANGLES, 0, giftBoxVertexCount);
+    glBindVertexArray(0);
 }
 
 void Renderer::renderExitPortal(Shader& shader, const glm::mat4& view,

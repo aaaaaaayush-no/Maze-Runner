@@ -16,8 +16,10 @@ void Collectible::placeItems(const std::vector<std::pair<int,int>>& positions) {
             1.0f, // floating height
             gy * CELL_SIZE + CELL_SIZE * 0.5f
         );
+        item.size = glm::vec2(COLLECTIBLE_SIZE, COLLECTIBLE_SIZE);
         item.type = types[i % 3];
         item.collected = false;
+        item.pickedUp = false;
         item.rotationAngle = 0.0f;
         items.push_back(item);
         i++;
@@ -26,7 +28,8 @@ void Collectible::placeItems(const std::vector<std::pair<int,int>>& positions) {
 
 void Collectible::update(float dt) {
     for (auto& item : items) {
-        if (!item.collected)
+        // Only rotate items still in the world (not collected/picked up)
+        if (!item.collected && !item.pickedUp)
             item.rotationAngle += 90.0f * dt; // degrees per second
     }
 }
@@ -42,6 +45,32 @@ bool Collectible::tryCollect(const glm::vec3& playerPos, float radius) {
         }
     }
     return collected;
+}
+
+// AABB overlap pickup: returns index of first overlapping uncollected item, or -1
+int Collectible::tryPickup(const glm::vec3& playerPos, bool alreadyCarrying) {
+    if (alreadyCarrying) return -1; // Can't pick up while already carrying
+
+    for (int i = 0; i < (int)items.size(); i++) {
+        auto& item = items[i];
+        if (item.collected || item.pickedUp) continue;
+
+        // AABB overlap test between player and collectable
+        float dx = std::abs(playerPos.x - item.position.x);
+        float dy = std::abs(playerPos.y - item.position.y);
+        float dz = std::abs(playerPos.z - item.position.z);
+
+        if (dx < PICKUP_HALF_WIDTH &&
+            dy < PICKUP_HALF_HEIGHT &&
+            dz < PICKUP_HALF_WIDTH) {
+            // Mark as both picked up (carried) and collected (counts toward total)
+            // so the win condition (allCollected) works immediately on pickup
+            item.pickedUp = true;
+            item.collected = true;
+            return i;
+        }
+    }
+    return -1;
 }
 
 int Collectible::getCollectedCount() const {

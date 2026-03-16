@@ -11,6 +11,11 @@ public:
     float yaw;
     float pitch;
 
+    // Carry state: tracks the currently carried collectable
+    bool isCarrying;
+    int  carriedItemIndex;   // Index into Collectible::items, or -1 if none
+    float carryTimer;        // Time spent carrying the current item
+
     Player();
 
     void init(float startX, float startZ);
