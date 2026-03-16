@@ -1,6 +1,6 @@
 # Maze Runner
 
-A 3D first-person maze exploration game built with OpenGL 3.3, featuring procedural generation, physics simulation, collectible items, a minimap system, difficulty levels and a star rating system.
+A 3D maze exploration game built with OpenGL 3.3, featuring procedural generation, physics simulation, collectible items, a minimap system, difficulty levels and a star rating system. Supports both **first-person and third-person camera views**.
 
 ![Maze Runner](https://img.shields.io/badge/OpenGL-3.3-blue) ![C++17](https://img.shields.io/badge/C%2B%2B-17-brightgreen)
 
@@ -8,10 +8,11 @@ A 3D first-person maze exploration game built with OpenGL 3.3, featuring procedu
 
 - **Procedural Maze Generation** – Recursive backtracking algorithm creates a unique maze every game
 - **Difficulty Levels** – EASY (15×15), MEDIUM (21×21), HARD (31×31) and NIGHTMARE (41×41) with scaled item counts and time thresholds
-- **First-Person 3D Rendering** – Textured geometry with procedural stone-brick wall textures, warm torch lighting, exponential fog, wireframe toggle
+- **First-Person & Third-Person Views** – Toggle between camera modes; first-person for immersive exploration, third-person to see your character and carried items
+- **3D Rendering** – Textured geometry with procedural stone-brick wall textures, warm torch lighting, exponential fog, wireframe toggle
 - **Physics** – Gravity (9.8 m/s²) and jump mechanics with AABB wall collision
-- **Minimap** – North-up top-right overlay with fog-of-war, compass rose, player arrow, item markers and exit indicator (toggle with M); scrolling viewport for larger mazes; legend panel (toggle with L)
-- **Collectible Items** – Keys (golden cubes), Artifacts (rotating pyramids) and Orbs (spheres) placed at dead ends
+- **Minimap** – North-up top-right overlay with fog-of-war, compass rose, player arrow, item markers and exit indicator; scrolling viewport for larger mazes
+- **Collectible Items** – Keys (golden cubes), Artifacts (rotating pyramids) and Orbs (spheres) placed at dead ends; stackable when carried
 - **Star Rating System** – Time-based 1–3 star rating on completion with animated win screen; perfect run bonus for collecting all items under the 3-star time
 - **Highscores** – Top 10 scores persisted to CSV with per-difficulty best-star tracking
 - **HUD** – Item counter, elapsed timer, difficulty indicator and star preview rendered with a segment-display font
@@ -19,16 +20,39 @@ A 3D first-person maze exploration game built with OpenGL 3.3, featuring procedu
 
 ## Controls
 
+### Gameplay
+
 | Key | Action |
 |-----|--------|
-| **W A S D** | Move forward / left / backward / right |
-| **Mouse** | Look around |
+| **W** | Move forward |
+| **A** | Move left |
+| **S** | Move backward |
+| **D** | Move right |
+| **Mouse** | Look around (camera control) |
 | **Space** | Jump |
-| **M** | Toggle minimap |
-| **L** | Toggle minimap legend |
+| **V** | Toggle between first-person and third-person view |
+| **T** | Toggle torch light on/off |
 | **R** | Restart with a new maze |
 | **F1** | Toggle wireframe rendering |
-| **ESC** | Quit |
+| **ESC** | Return to title screen (or quit from title screen) |
+
+### Menu Navigation (Title Screen)
+
+| Key | Action |
+|-----|--------|
+| **↑ / ↓** | Navigate menu options |
+| **← / →** | Adjust difficulty selection |
+| **Enter** | Confirm selection |
+| **ESC** | Quit game |
+
+## Camera Views
+
+The game supports **two camera modes** that you can toggle between using the **V** key:
+
+- **First-Person View (Default)** – Camera positioned at eye level for immersive maze exploration. Only your hands are visible in this mode.
+- **Third-Person View** – Camera positioned behind and above your character, allowing you to see your player model and the stack of collectible items you're carrying. Useful for admiring your loot!
+
+The third-person camera automatically follows your character's orientation and maintains a comfortable viewing distance.
 
 ## Requirements
 
@@ -99,7 +123,7 @@ cd build
 └── src/
     ├── main.cpp           # Game loop, input, HUD, win logic
     ├── Maze.h/cpp         # Procedural maze generation & storage
-    ├── Player.h/cpp       # First-person camera, movement, physics
+    ├── Player.h/cpp       # Camera system (first-person/third-person), movement, physics
     ├── Renderer.h/cpp     # OpenGL rendering pipeline & procedural textures
     ├── Minimap.h/cpp      # 2D minimap overlay with fog of war
     ├── Collectible.h/cpp  # Item placement & collection
@@ -117,6 +141,7 @@ cd build
 |-----------|---------------|
 | Maze algorithm | Recursive backtracking on an odd-dimensioned grid |
 | Difficulty | 4 tiers (EASY–NIGHTMARE) scaling maze size, items and time thresholds |
+| Camera | First-person (eye-level) and third-person (behind/above shoulder) modes; toggleable with V key |
 | Rendering | VBO/VAO with per-vertex position + color + normal + texcoord (stride 11 floats for maze, 9 for objects) |
 | Textures | Procedural 128×128 stone-brick wall texture and 64×64 graffiti decals generated at init; external PNGs loaded when present; `useTexture` uniform toggles sampling in fragment shader |
 | Shading | Directional light (Gouraud) + exponential fog + warm torch tint |
