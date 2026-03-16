@@ -63,7 +63,8 @@ int Collectible::tryPickup(const glm::vec3& playerPos, bool alreadyCarrying) {
         if (dx < PICKUP_HALF_WIDTH &&
             dy < PICKUP_HALF_HEIGHT &&
             dz < PICKUP_HALF_WIDTH) {
-            // Mark as picked up and collected
+            // Mark as both picked up (carried) and collected (counts toward total)
+            // so the win condition (allCollected) works immediately on pickup
             item.pickedUp = true;
             item.collected = true;
             return i;

@@ -1037,7 +1037,7 @@ void Renderer::renderCarriedCollectible(Shader& shader, const glm::mat4& view,
     glBindTexture(GL_TEXTURE_2D, giftBoxTextureID);
     shader.setInt("wallTexture", 0);
 
-    // Compute carried position: offset from player in front + below eye level + slightly right
+    // Compute carried position: offset from player in front, below eye level, to the right
     glm::vec3 flatFront = glm::normalize(glm::vec3(playerFront.x, 0.0f, playerFront.z));
     glm::vec3 right = glm::normalize(glm::cross(flatFront, glm::vec3(0.0f, 1.0f, 0.0f)));
     glm::vec3 carriedPos = playerPos

@@ -696,7 +696,9 @@ int main() {
         }
 
         // Render carried collectible on top of player (after hands for visibility)
-        if (game.player.isCarrying) {
+        if (game.player.isCarrying &&
+            game.player.carriedItemIndex >= 0 &&
+            game.player.carriedItemIndex < (int)game.collectibles.getItems().size()) {
             game.renderer.renderCarriedCollectible(
                 mainShader, view, projection,
                 game.player.position, game.player.getFront(),
