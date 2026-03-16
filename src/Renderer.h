@@ -37,6 +37,16 @@ public:
                           bool torchEnabled, const glm::vec3& torchPos,
                           const glm::vec3& torchColor, float torchRadius);
 
+    // Render a carried collectable attached to the player
+    void renderCarriedCollectible(Shader& shader, const glm::mat4& view,
+                                  const glm::mat4& projection,
+                                  const glm::vec3& playerPos,
+                                  const glm::vec3& playerFront,
+                                  const glm::vec3& sunDir, const glm::vec3& sunColor,
+                                  float ambientLevel, const glm::vec3& fogCol,
+                                  bool torchEnabled, const glm::vec3& torchPos,
+                                  const glm::vec3& torchColor, float torchRadius);
+
     void setWireframe(bool enabled);
 
 private:
@@ -44,17 +54,22 @@ private:
     unsigned int mazeVAO, mazeVBO;
     int mazeVertexCount;
 
-    // Cube geometry (for keys)
+    // Cube geometry (for keys - legacy, kept for exit portal)
     unsigned int cubeVAO, cubeVBO;
     int cubeVertexCount;
 
-    // Pyramid geometry (for artifacts)
+    // Pyramid geometry (for artifacts - legacy)
     unsigned int pyramidVAO, pyramidVBO;
     int pyramidVertexCount;
 
-    // Sphere geometry (for orbs)
+    // Sphere geometry (for orbs and exit portal)
     unsigned int sphereVAO, sphereVBO;
     int sphereVertexCount;
+
+    // Gift box geometry and texture (used for all collectables)
+    unsigned int giftBoxVAO, giftBoxVBO;
+    int giftBoxVertexCount;
+    unsigned int giftBoxTextureID;
 
     // Wall texture
     unsigned int wallTextureID;
@@ -81,7 +96,9 @@ private:
     void buildCubeMesh();
     void buildPyramidMesh();
     void buildSphereMesh();
+    void buildGiftBoxMesh();
     void generateWallTexture();
+    void generateGiftBoxTexture();
     void generateGraffitiTextures();
     void buildGraffitiMesh(const Maze& maze);
 
