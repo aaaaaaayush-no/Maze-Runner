@@ -10,9 +10,7 @@ Player::Player()
     : position(0.0f)
     , yaw(-90.0f)
     , pitch(0.0f)
-    , isCarrying(false)
-    , carriedItemIndex(-1)
-    , carryTimer(0.0f)
+    , thirdPerson(false)
     , moveSpeed(5.0f)
     , mouseSensitivity(0.1f)
     , cameraHeight(1.7f)
@@ -31,9 +29,7 @@ void Player::init(float startX, float startZ) {
     pitch = 0.0f;
     velocityY = 0.0f;
     onGround = true;
-    isCarrying = false;
-    carriedItemIndex = -1;
-    carryTimer = 0.0f;
+    carriedItems.clear();
 }
 
 void Player::processMouseMovement(float xOffset, float yOffset) {
@@ -57,6 +53,13 @@ glm::vec3 Player::getFront() const {
 
 glm::mat4 Player::getViewMatrix() const {
     glm::vec3 front = getFront();
+    if (thirdPerson) {
+        // Camera 4 units behind and 2.5 units above the player
+        glm::vec3 flatFront = glm::normalize(glm::vec3(front.x, 0.0f, front.z));
+        glm::vec3 camPos = position - flatFront * 4.0f + glm::vec3(0.0f, 2.5f, 0.0f);
+        glm::vec3 lookAt = position + glm::vec3(0.0f, 0.3f, 0.0f);
+        return glm::lookAt(camPos, lookAt, glm::vec3(0.0f, 1.0f, 0.0f));
+    }
     return glm::lookAt(position, position + front, glm::vec3(0.0f, 1.0f, 0.0f));
 }
 

@@ -15,25 +15,25 @@ public:
     void init();
     void cleanup();
 
-    // Update (no-op: permanent night)
+    // Update: advances timeOfDay based on dt
     void update(float dt);
 
     // Render sky background (call before maze rendering, with depth write off)
     void render(const glm::mat4& view, const glm::mat4& projection);
 
-    // Get current moon direction for lighting
+    // Get current sun/moon direction for lighting
     glm::vec3 getSunDirection() const;
 
-    // Get current moon color for lighting
+    // Get current sun/moon color for lighting
     glm::vec3 getSunColor() const;
 
-    // Get current fog color based on night sky
+    // Get current fog color based on time of day
     glm::vec3 getFogColor() const;
 
     // Get current ambient light level (0-1)
     float getAmbientLevel() const;
 
-    // Time of day (permanently 0.0 = midnight)
+    // Time of day in [0,1): 0=midnight, 0.25=sunrise, 0.5=noon, 0.75=sunset
     float getTimeOfDay() const { return timeOfDay; }
 
 private:
@@ -45,7 +45,11 @@ private:
 
     unsigned int skyShaderID;
 
-    float timeOfDay;         // permanently 0.0 (midnight)
+    // [0,1): 0=midnight, 0.25=sunrise, 0.5=noon, 0.75=sunset
+    float timeOfDay;
+
+    // Speed: 1.0 / secondsPerDay
+    static constexpr float DAY_CYCLE_SPEED = 1.0f / 90.0f;
 
     void compileSkyShader();
     void buildSunMesh();

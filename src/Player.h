@@ -2,6 +2,7 @@
 #define PLAYER_H
 
 #include <glm/glm.hpp>
+#include <vector>
 
 class Maze;
 
@@ -11,10 +12,11 @@ public:
     float yaw;
     float pitch;
 
-    // Carry state: tracks the currently carried collectable
-    bool isCarrying;
-    int  carriedItemIndex;   // Index into Collectible::items, or -1 if none
-    float carryTimer;        // Time spent carrying the current item
+    // Stack of carried collectible indices (into Collectible::items)
+    std::vector<int> carriedItems;
+
+    // Third-person perspective toggle
+    bool thirdPerson;
 
     Player();
 

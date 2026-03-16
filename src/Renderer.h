@@ -29,23 +29,35 @@ public:
                             float ambientLevel, const glm::vec3& fogCol,
                             bool torchEnabled, const glm::vec3& torchPos,
                             const glm::vec3& torchColor, float torchRadius);
-    void renderExitPortal(Shader& shader, const glm::mat4& view,
-                          const glm::mat4& projection,
-                          const glm::vec3& exitPos, float time,
-                          const glm::vec3& sunDir, const glm::vec3& sunColor,
-                          float ambientLevel, const glm::vec3& fogCol,
-                          bool torchEnabled, const glm::vec3& torchPos,
-                          const glm::vec3& torchColor, float torchRadius);
 
-    // Render a carried collectable attached to the player
+    // Render the cauldron destination (replaces exit portal)
+    void renderCauldron(Shader& shader, const glm::mat4& view,
+                        const glm::mat4& projection,
+                        const glm::vec3& cauldronPos, float time,
+                        const glm::vec3& sunDir, const glm::vec3& sunColor,
+                        float ambientLevel, const glm::vec3& fogCol,
+                        bool torchEnabled, const glm::vec3& torchPos,
+                        const glm::vec3& torchColor, float torchRadius);
+
+    // Render a stack of carried collectibles attached to the player
     void renderCarriedCollectible(Shader& shader, const glm::mat4& view,
                                   const glm::mat4& projection,
                                   const glm::vec3& playerPos,
                                   const glm::vec3& playerFront,
+                                  int carryCount,
                                   const glm::vec3& sunDir, const glm::vec3& sunColor,
                                   float ambientLevel, const glm::vec3& fogCol,
                                   bool torchEnabled, const glm::vec3& torchPos,
                                   const glm::vec3& torchColor, float torchRadius);
+
+    // Render the player model (for third-person view)
+    void renderPlayer(Shader& shader, const glm::mat4& view,
+                      const glm::mat4& projection,
+                      const glm::vec3& playerPos, float yaw,
+                      const glm::vec3& sunDir, const glm::vec3& sunColor,
+                      float ambientLevel, const glm::vec3& fogCol,
+                      bool torchEnabled, const glm::vec3& torchPos,
+                      const glm::vec3& torchColor, float torchRadius);
 
     void setWireframe(bool enabled);
 
@@ -54,15 +66,15 @@ private:
     unsigned int mazeVAO, mazeVBO;
     int mazeVertexCount;
 
-    // Cube geometry (for keys - legacy, kept for exit portal)
+    // Cube geometry (neutral white, used for player model and cauldron parts)
     unsigned int cubeVAO, cubeVBO;
     int cubeVertexCount;
 
-    // Pyramid geometry (for artifacts - legacy)
+    // Pyramid geometry (legacy, kept for potential use)
     unsigned int pyramidVAO, pyramidVBO;
     int pyramidVertexCount;
 
-    // Sphere geometry (for orbs and exit portal)
+    // Sphere geometry (kept for potential use)
     unsigned int sphereVAO, sphereVBO;
     int sphereVertexCount;
 
@@ -90,6 +102,10 @@ private:
     // Graffiti config: filenames to load from textures/graffiti/
     static const std::vector<std::string> GRAFFITI_FILES;
     static constexpr float GRAFFITI_CHANCE = 0.05f; // 5% chance per eligible wall face
+
+    // Dynamic scratch buffers for cauldron and player rendering
+    unsigned int scratchVAO, scratchVBO;
+    unsigned int playerScratchVAO, playerScratchVBO;
 
     bool wireframe;
 
