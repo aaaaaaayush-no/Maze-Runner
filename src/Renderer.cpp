@@ -1070,9 +1070,9 @@ void Renderer::renderCarriedCollectible(Shader& shader, const glm::mat4& view,
     }
 }
 
-void Renderer::renderCauldron(Shader& shader, const glm::mat4& view,
+void Renderer::renderExitZone(Shader& shader, const glm::mat4& view,
                               const glm::mat4& projection,
-                              const glm::vec3& cauldronPos, float time,
+                              const glm::vec3& exitPos, float time,
                               const glm::vec3& sunDir, const glm::vec3& sunColor,
                               float ambientLevel, const glm::vec3& fogCol,
                               bool torchEnabled, const glm::vec3& torchPos,
@@ -1105,50 +1105,53 @@ void Renderer::renderCauldron(Shader& shader, const glm::mat4& view,
         glBindVertexArray(0);
     };
 
-    // --- Cauldron body ---
-    // Dark stone legs (four short pillars at corners)
-    float legH = 0.35f, legW = 0.18f;
-    float legOff = 0.38f;
-    float stoneR = 0.28f, stoneG = 0.28f, stoneB = 0.30f;
-    for (float lx : {-legOff, legOff}) {
-        for (float lz : {-legOff, legOff}) {
-            drawCube(cauldronPos + glm::vec3(lx, legH * 0.5f, lz),
-                     glm::vec3(legW, legH, legW), stoneR, stoneG, stoneB);
+    // --- Exit Zone Platform ---
+    // Create a large, open, flat platform with a distinct floor
+    // Floor platform (lighter stone, wider than normal corridor)
+    float platformSize = 4.0f;  // 4x4 units (2 cells wide)
+    drawCube(exitPos + glm::vec3(0.0f, 0.05f, 0.0f),
+             glm::vec3(platformSize, 0.1f, platformSize),
+             0.7f, 0.75f, 0.7f);  // Light gray stone
+
+    // Four corner pillars with glowing tops (to mark the exit zone)
+    float pillarH = 0.8f;
+    float pillarW = 0.15f;
+    float pillarOff = platformSize * 0.4f;
+    for (float px : {-pillarOff, pillarOff}) {
+        for (float pz : {-pillarOff, pillarOff}) {
+            // Stone pillar
+            drawCube(exitPos + glm::vec3(px, pillarH * 0.5f, pz),
+                     glm::vec3(pillarW, pillarH, pillarW),
+                     0.5f, 0.5f, 0.55f);
+
+            // Glowing top
+            float glowPulse = 0.5f + 0.5f * sin(time * 2.0f + px + pz);
+            drawCube(exitPos + glm::vec3(px, pillarH + 0.1f, pz),
+                     glm::vec3(pillarW * 1.5f, 0.1f, pillarW * 1.5f),
+                     0.2f * glowPulse, 0.8f * glowPulse, 0.2f * glowPulse);
         }
     }
 
-    // Cauldron bowl body (wide dark cylinder approximated as thick cube)
-    float bowlY = legH + 0.30f;
-    drawCube(cauldronPos + glm::vec3(0.0f, bowlY, 0.0f),
-             glm::vec3(0.95f, 0.60f, 0.95f), 0.22f, 0.22f, 0.25f);
+    // Central glowing marker (floating above ground)
+    float floatHeight = 0.8f + sin(time * 1.5f) * 0.15f;
+    float centralGlow = 0.6f + 0.4f * sin(time * 2.5f);
+    drawCube(exitPos + glm::vec3(0.0f, floatHeight, 0.0f),
+             glm::vec3(0.3f, 0.3f, 0.3f),
+             0.3f * centralGlow, 1.0f * centralGlow, 0.3f * centralGlow);
 
-    // Inner rim – slightly wider and thinner, raised
-    float rimY = legH + 0.62f;
-    drawCube(cauldronPos + glm::vec3(0.0f, rimY, 0.0f),
-             glm::vec3(1.05f, 0.12f, 1.05f), 0.30f, 0.30f, 0.33f);
-
-    // Bubbling dark liquid surface
-    float bubbleAnim = sin(time * 2.5f) * 0.03f;
-    float liquidY = legH + 0.52f + bubbleAnim;
-    // Dark green/purple magic liquid
-    float pulse = 0.5f + 0.5f * sin(time * 3.0f);
-    float liqR = 0.05f + 0.05f * pulse;
-    float liqG = 0.25f + 0.10f * pulse;
-    float liqB = 0.10f + 0.05f * pulse;
-    drawCube(cauldronPos + glm::vec3(0.0f, liquidY, 0.0f),
-             glm::vec3(0.82f, 0.08f, 0.82f), liqR, liqG, liqB);
-
-    // Magical glow particles (small cubes rising above)
-    for (int i = 0; i < 3; i++) {
-        float angle = time * 1.8f + i * 2.094f; // 120° apart
-        float radius = 0.15f;
-        float riseY  = 0.10f + sin(time * 2.0f + i * 1.5f) * 0.08f + 0.25f * i;
-        glm::vec3 ppos = cauldronPos + glm::vec3(
-            radius * cos(angle), liquidY + riseY, radius * sin(angle));
-        float intensity = 0.5f + 0.5f * sin(time * 3.0f + i);
-        drawCube(ppos, glm::vec3(0.12f), 0.1f * intensity, 0.8f * intensity, 0.3f * intensity);
+    // Orbiting particles around the central marker
+    for (int i = 0; i < 4; i++) {
+        float angle = time * 2.0f + i * 1.571f; // 90° apart
+        float radius = 0.5f;
+        float particleY = floatHeight + sin(time * 3.0f + i * 1.2f) * 0.1f;
+        glm::vec3 ppos = exitPos + glm::vec3(
+            radius * cos(angle), particleY, radius * sin(angle));
+        float intensity = 0.5f + 0.5f * sin(time * 4.0f + i);
+        drawCube(ppos, glm::vec3(0.08f),
+                 0.2f * intensity, 0.9f * intensity, 0.2f * intensity);
     }
 }
+
 
 void Renderer::renderPlayer(Shader& shader, const glm::mat4& view,
                             const glm::mat4& projection,

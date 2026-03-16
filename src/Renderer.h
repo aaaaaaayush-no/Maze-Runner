@@ -30,10 +30,10 @@ public:
                             bool torchEnabled, const glm::vec3& torchPos,
                             const glm::vec3& torchColor, float torchRadius);
 
-    // Render the cauldron destination (replaces exit portal)
-    void renderCauldron(Shader& shader, const glm::mat4& view,
+    // Render the exit zone (open area at maze end)
+    void renderExitZone(Shader& shader, const glm::mat4& view,
                         const glm::mat4& projection,
-                        const glm::vec3& cauldronPos, float time,
+                        const glm::vec3& exitPos, float time,
                         const glm::vec3& sunDir, const glm::vec3& sunColor,
                         float ambientLevel, const glm::vec3& fogCol,
                         bool torchEnabled, const glm::vec3& torchPos,

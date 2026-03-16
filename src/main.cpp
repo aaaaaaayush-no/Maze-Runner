@@ -378,6 +378,7 @@ struct GameState {
     bool won;
     bool wireframe;
     Difficulty difficulty;
+    int boxesDelivered;  // New: count of boxes delivered to exit zone
 
     // Win screen state
     float winScreenStartTime;
@@ -388,6 +389,7 @@ struct GameState {
     GameState(Difficulty diff)
         : maze(getDifficultyConfig(diff).mazeWidth, getDifficultyConfig(diff).mazeHeight),
           elapsedTime(0), won(false), wireframe(false), difficulty(diff),
+          boxesDelivered(0),
           winScreenStartTime(0), scoreSaved(false)
     {
         starResult.stars = 0;
@@ -416,6 +418,7 @@ struct GameState {
 
         elapsedTime = 0.0f;
         won = false;
+        boxesDelivered = 0;
         winScreenStartTime = 0.0f;
         starResult.stars = 0;
         starResult.perfectRun = false;
@@ -592,10 +595,14 @@ int main() {
             }
         }
 
-        // Auto-deposit carried items when near the cauldron
-        float distToCauldron = glm::length(game.player.position - game.exitWorldPos);
-        bool nearCauldron = (distToCauldron < 2.0f);
-        if (nearCauldron && !game.player.carriedItems.empty()) {
+        // Auto-deliver carried items when entering the exit zone
+        float distToExit = glm::length(game.player.position - game.exitWorldPos);
+        bool inExitZone = (distToExit < 2.5f);  // Slightly larger radius for open area feel
+        if (inExitZone && !game.player.carriedItems.empty()) {
+            // Count delivered boxes
+            game.boxesDelivered += (int)game.player.carriedItems.size();
+
+            // Mark items as collected (delivered)
             auto& items = game.collectibles.getItemsMut();
             for (int idx : game.player.carriedItems) {
                 if (idx >= 0 && idx < (int)items.size()) {
@@ -606,23 +613,25 @@ int main() {
             game.player.carriedItems.clear();
         }
 
-        // Check win condition: all items deposited AND at cauldron
-        if (!game.won && game.collectibles.allCollected() && nearCauldron) {
+        // Check win condition: player enters exit zone (regardless of boxes collected)
+        if (!game.won && inExitZone) {
             game.won = true;
             game.winScreenStartTime = currentTime;
 
-            // Calculate stars
+            // Calculate stars based on time and items collected
+            bool allCollected = game.collectibles.allCollected();
             game.starResult = calculateStars(currentDifficulty,
-                                             game.elapsedTime, true);
+                                             game.elapsedTime, allCollected);
 
             // Save highscore
             if (!game.scoreSaved) {
                 HighscoreEntry entry;
                 entry.name = "Player";
-                entry.score = std::max(1, (int)(10000.0f / (game.elapsedTime + 1.0f)));
+                // New scoring: base score on delivered boxes count
+                entry.score = game.boxesDelivered * 100;  // 100 points per box
                 entry.time = game.elapsedTime;
                 entry.difficulty = (int)currentDifficulty;
-                entry.collectables = game.collectibles.getDepositedCount();
+                entry.collectables = game.boxesDelivered;
                 entry.stars = game.starResult.stars;
                 entry.perfectRun = game.starResult.perfectRun ? 1 : 0;
                 addHighscore(HIGHSCORE_FILE, entry);
@@ -680,8 +689,8 @@ int main() {
                                           sunDir, sunColor, ambientLevel, fogCol,
                                           torchOn, torchPos, torchCol, torchRadius);
 
-        // Cauldron (replaces exit portal)
-        game.renderer.renderCauldron(mainShader, view, projection,
+        // Exit zone (open area at maze end)
+        game.renderer.renderExitZone(mainShader, view, projection,
                                      game.exitWorldPos, currentTime,
                                      sunDir, sunColor, ambientLevel, fogCol,
                                      torchOn, torchPos, torchCol, torchRadius);
@@ -719,23 +728,22 @@ int main() {
 
         // HUD text
         {
-            // Item counter (grabbed or deposited / total)
+            // Boxes delivered counter
             char buf[64];
-            std::snprintf(buf, sizeof(buf), "%d/%d",
-                          game.collectibles.getCollectedCount(),
-                          game.collectibles.getTotalCount());
+            std::snprintf(buf, sizeof(buf), "DELIVERED %d",
+                          game.boxesDelivered);
             hud.renderText(hudShader, buf,
                            20, (float)screenHeight - 40, 16, 24,
-                           1.0f, 0.84f, 0.0f,
+                           0.3f, 1.0f, 0.5f,
                            screenWidth, screenHeight);
 
             // Stack count (items currently in hand)
             int stackSize = (int)game.player.carriedItems.size();
             if (stackSize > 0) {
-                std::snprintf(buf, sizeof(buf), "HOLD %d", stackSize);
+                std::snprintf(buf, sizeof(buf), "CARRY %d", stackSize);
                 hud.renderText(hudShader, buf,
                                20, (float)screenHeight - 70, 12, 18,
-                               0.3f, 1.0f, 0.5f,
+                               1.0f, 0.84f, 0.0f,
                                screenWidth, screenHeight);
             }
 
@@ -799,12 +807,20 @@ int main() {
                                          screenWidth, screenHeight);
                 }
 
-                // Score
-                int score = std::max(1, (int)(10000.0f / (game.elapsedTime + 1.0f)));
-                std::snprintf(buf, sizeof(buf), "%05d", score);
+                // Score (based on boxes delivered)
+                int score = game.boxesDelivered * 100;
+                std::snprintf(buf, sizeof(buf), "BOXES %d", game.boxesDelivered);
                 hud.renderText(hudShader, buf,
-                               (float)screenWidth / 2 - 50,
-                               (float)screenHeight / 2 - 100,
+                               (float)screenWidth / 2 - 80,
+                               (float)screenHeight / 2 - 80,
+                               16, 24,
+                               0.3f, 1.0f, 0.5f,
+                               screenWidth, screenHeight);
+
+                std::snprintf(buf, sizeof(buf), "SCORE %05d", score);
+                hud.renderText(hudShader, buf,
+                               (float)screenWidth / 2 - 80,
+                               (float)screenHeight / 2 - 120,
                                20, 30,
                                1.0f, 1.0f, 1.0f,
                                screenWidth, screenHeight);
