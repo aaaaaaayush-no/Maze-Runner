@@ -27,6 +27,7 @@ public:
 
     glm::mat4 getViewMatrix() const;
     glm::vec3 getFront() const;
+    glm::vec3 getCameraPosition() const;
 
     bool isOnGround() const { return onGround; }
 
@@ -41,7 +42,18 @@ private:
     float jumpForce;
     bool onGround;
 
+    // Third-person camera state
+    mutable glm::vec3 currentCameraPos;
+    mutable bool cameraInitialized;
+    float cameraDistance;
+    float cameraHeight3P;
+    float cameraFollowSpeed;
+    float cameraMinDistance;
+    float cameraMaxDistance;
+
     bool checkCollision(const glm::vec3& pos, const Maze& maze) const;
+    glm::vec3 calculateDesiredCameraPosition() const;
+    bool checkCameraObstruction(const glm::vec3& from, const glm::vec3& to, const Maze& maze) const;
 };
 
 #endif

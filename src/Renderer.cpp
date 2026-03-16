@@ -1106,50 +1106,92 @@ void Renderer::renderExitZone(Shader& shader, const glm::mat4& view,
         glBindVertexArray(0);
     };
 
-    // --- Exit Zone Platform ---
-    // Create a large, open, flat platform with a distinct floor
-    // Floor platform (lighter stone, wider than normal corridor)
-    float platformSize = 4.0f;  // 4x4 units (2 cells wide)
+    // --- Exit Zone: Gateway to Infinite Outside World ---
+
+    // Large platform representing the transition area
+    float platformSize = 6.0f;  // Larger platform (6x6 units = 3 cells)
     drawCube(exitPos + glm::vec3(0.0f, 0.05f, 0.0f),
              glm::vec3(platformSize, 0.1f, platformSize),
-             0.7f, 0.75f, 0.7f);  // Light gray stone
+             0.8f, 0.85f, 0.9f);  // Light, almost white stone
 
-    // Four corner pillars with glowing tops (to mark the exit zone)
-    float pillarH = 0.8f;
-    float pillarW = 0.15f;
-    float pillarOff = platformSize * 0.4f;
-    for (float px : {-pillarOff, pillarOff}) {
-        for (float pz : {-pillarOff, pillarOff}) {
-            // Stone pillar
-            drawCube(exitPos + glm::vec3(px, pillarH * 0.5f, pz),
-                     glm::vec3(pillarW, pillarH, pillarW),
-                     0.5f, 0.5f, 0.55f);
+    // Create a visual boundary arch/gateway
+    // Two large pillars on either side
+    float archHeight = 5.0f;
+    float archWidth = 0.4f;
+    float archSpacing = 3.5f;
 
-            // Glowing top
+    // Left pillar
+    drawCube(exitPos + glm::vec3(-archSpacing, archHeight * 0.5f, 0.0f),
+             glm::vec3(archWidth, archHeight, archWidth),
+             0.6f, 0.65f, 0.7f);
+
+    // Right pillar
+    drawCube(exitPos + glm::vec3(archSpacing, archHeight * 0.5f, 0.0f),
+             glm::vec3(archWidth, archHeight, archWidth),
+             0.6f, 0.65f, 0.7f);
+
+    // Archway top (lintel)
+    drawCube(exitPos + glm::vec3(0.0f, archHeight, 0.0f),
+             glm::vec3(archSpacing * 2.0f + archWidth, archWidth, archWidth),
+             0.6f, 0.65f, 0.7f);
+
+    // Glowing energy curtain representing the exit portal
+    float curtainPulse = 0.3f + 0.2f * sin(time * 1.5f);
+    float curtainAlpha = 0.4f + 0.3f * sin(time * 2.0f);
+    drawCube(exitPos + glm::vec3(0.0f, archHeight * 0.5f, 0.0f),
+             glm::vec3(archSpacing * 2.0f - archWidth, archHeight * 0.9f, 0.1f),
+             0.5f * curtainPulse, 0.8f * curtainPulse, 1.0f * curtainPulse);
+
+    // Four corner markers showing the boundary of the exit zone
+    float markerH = 1.5f;
+    float markerW = 0.2f;
+    float markerOff = platformSize * 0.45f;
+    for (float px : {-markerOff, markerOff}) {
+        for (float pz : {-markerOff, markerOff}) {
+            // Marker pillar
+            drawCube(exitPos + glm::vec3(px, markerH * 0.5f, pz),
+                     glm::vec3(markerW, markerH, markerW),
+                     0.5f, 0.55f, 0.6f);
+
+            // Pulsing light at top
             float glowPulse = 0.5f + 0.5f * sin(time * 2.0f + px + pz);
-            drawCube(exitPos + glm::vec3(px, pillarH + 0.1f, pz),
-                     glm::vec3(pillarW * 1.5f, 0.1f, pillarW * 1.5f),
-                     0.2f * glowPulse, 0.8f * glowPulse, 0.2f * glowPulse);
+            drawCube(exitPos + glm::vec3(px, markerH + 0.15f, pz),
+                     glm::vec3(markerW * 2.0f, 0.15f, markerW * 2.0f),
+                     0.3f * glowPulse, 0.9f * glowPulse, 1.0f * glowPulse);
         }
     }
 
-    // Central glowing marker (floating above ground)
-    float floatHeight = 0.8f + sin(time * 1.5f) * 0.15f;
+    // Central floating beacon
+    float floatHeight = 1.5f + sin(time * 1.5f) * 0.2f;
     float centralGlow = 0.6f + 0.4f * sin(time * 2.5f);
     drawCube(exitPos + glm::vec3(0.0f, floatHeight, 0.0f),
-             glm::vec3(0.3f, 0.3f, 0.3f),
-             0.3f * centralGlow, 1.0f * centralGlow, 0.3f * centralGlow);
+             glm::vec3(0.4f, 0.4f, 0.4f),
+             0.4f * centralGlow, 0.9f * centralGlow, 1.0f * centralGlow);
 
-    // Orbiting particles around the central marker
-    for (int i = 0; i < 4; i++) {
-        float angle = time * 2.0f + i * 1.571f; // 90° apart
-        float radius = 0.5f;
-        float particleY = floatHeight + sin(time * 3.0f + i * 1.2f) * 0.1f;
+    // Orbiting particles around the beacon (representing freedom/escape)
+    for (int i = 0; i < 6; i++) {
+        float angle = time * 2.5f + i * (6.283f / 6.0f); // 60° apart
+        float radius = 0.7f;
+        float particleY = floatHeight + sin(time * 3.0f + i * 1.2f) * 0.15f;
         glm::vec3 ppos = exitPos + glm::vec3(
             radius * cos(angle), particleY, radius * sin(angle));
         float intensity = 0.5f + 0.5f * sin(time * 4.0f + i);
-        drawCube(ppos, glm::vec3(0.08f),
-                 0.2f * intensity, 0.9f * intensity, 0.2f * intensity);
+        drawCube(ppos, glm::vec3(0.1f),
+                 0.3f * intensity, 0.8f * intensity, 1.0f * intensity);
+    }
+
+    // Add ground-level light rings expanding outward (representing the infinite world)
+    for (int ring = 0; ring < 3; ring++) {
+        float ringRadius = 2.5f + ring * 1.5f;
+        float ringPulse = sin(time * 2.0f - ring * 0.5f) * 0.5f + 0.5f;
+        int segments = 12;
+        for (int seg = 0; seg < segments; seg++) {
+            float angle = (seg / (float)segments) * 6.283f;
+            glm::vec3 ringPos = exitPos + glm::vec3(
+                ringRadius * cos(angle), 0.2f, ringRadius * sin(angle));
+            drawCube(ringPos, glm::vec3(0.15f, 0.1f, 0.15f),
+                     0.4f * ringPulse, 0.7f * ringPulse, 0.9f * ringPulse);
+        }
     }
 }
 

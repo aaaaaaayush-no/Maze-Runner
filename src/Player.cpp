@@ -18,6 +18,13 @@ Player::Player()
     , gravity(9.8f)
     , jumpForce(4.5f)
     , onGround(true)
+    , currentCameraPos(0.0f)
+    , cameraInitialized(false)
+    , cameraDistance(4.0f)
+    , cameraHeight3P(2.5f)
+    , cameraFollowSpeed(8.0f)
+    , cameraMinDistance(2.0f)
+    , cameraMaxDistance(6.0f)
 {
 }
 
@@ -30,6 +37,7 @@ void Player::init(float startX, float startZ) {
     velocityY = 0.0f;
     onGround = true;
     carriedItems.clear();
+    cameraInitialized = false;
 }
 
 void Player::processMouseMovement(float xOffset, float yOffset) {
@@ -51,15 +59,82 @@ glm::vec3 Player::getFront() const {
     return glm::normalize(front);
 }
 
+glm::vec3 Player::calculateDesiredCameraPosition() const {
+    glm::vec3 front = getFront();
+    // Use flat front (no pitch) for camera positioning
+    glm::vec3 flatFront = glm::normalize(glm::vec3(front.x, 0.0f, front.z));
+
+    // Calculate position behind and above the player
+    glm::vec3 desiredPos = position - flatFront * cameraDistance;
+    desiredPos.y = position.y + cameraHeight3P;
+
+    return desiredPos;
+}
+
+bool Player::checkCameraObstruction(const glm::vec3& from, const glm::vec3& to, const Maze& maze) const {
+    // Raycast from player to camera position to check for walls
+    glm::vec3 dir = to - from;
+    float distance = glm::length(dir);
+    if (distance < 0.001f) return false;
+
+    dir = glm::normalize(dir);
+
+    // Sample along the ray
+    int steps = (int)(distance / 0.2f) + 1;
+    for (int i = 1; i <= steps; i++) {
+        float t = (float)i / (float)steps;
+        glm::vec3 samplePos = from + dir * (distance * t);
+
+        int gx = (int)std::floor(samplePos.x / CELL_SIZE);
+        int gz = (int)std::floor(samplePos.z / CELL_SIZE);
+
+        if (maze.isWall(gx, gz)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+glm::vec3 Player::getCameraPosition() const {
+    if (thirdPerson) {
+        return currentCameraPos;
+    }
+    return position;
+}
+
 glm::mat4 Player::getViewMatrix() const {
     glm::vec3 front = getFront();
+
     if (thirdPerson) {
-        // Camera 4 units behind and 2.5 units above the player
-        glm::vec3 flatFront = glm::normalize(glm::vec3(front.x, 0.0f, front.z));
-        glm::vec3 camPos = position - flatFront * 4.0f + glm::vec3(0.0f, 2.5f, 0.0f);
+        // Calculate desired camera position
+        glm::vec3 desiredCameraPos = calculateDesiredCameraPosition();
+
+        // Initialize camera position on first frame
+        if (!cameraInitialized) {
+            currentCameraPos = desiredCameraPos;
+            cameraInitialized = true;
+        }
+
+        // Smooth follow with lerp (note: this is frame-rate dependent,
+        // but acceptable for camera smoothing)
+        float followSpeed = cameraFollowSpeed * 0.016f; // Approximate 60fps
+        currentCameraPos = glm::mix(currentCameraPos, desiredCameraPos,
+                                   glm::clamp(followSpeed, 0.0f, 1.0f));
+
+        // Clamp distance from player
+        glm::vec3 toCamera = currentCameraPos - position;
+        float dist = glm::length(toCamera);
+        if (dist > cameraMaxDistance) {
+            currentCameraPos = position + glm::normalize(toCamera) * cameraMaxDistance;
+        } else if (dist < cameraMinDistance && dist > 0.001f) {
+            currentCameraPos = position + glm::normalize(toCamera) * cameraMinDistance;
+        }
+
+        // Look at player with slight upward offset
         glm::vec3 lookAt = position + glm::vec3(0.0f, 0.3f, 0.0f);
-        return glm::lookAt(camPos, lookAt, glm::vec3(0.0f, 1.0f, 0.0f));
+        return glm::lookAt(currentCameraPos, lookAt, glm::vec3(0.0f, 1.0f, 0.0f));
     }
+
     return glm::lookAt(position, position + front, glm::vec3(0.0f, 1.0f, 0.0f));
 }
 
