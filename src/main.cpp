@@ -578,8 +578,26 @@ int main() {
         torchLight.update(frameTime);
         torchLight.setPlayerPosition(game.player.position, game.player.getFront());
 
-        // Try collecting items
-        game.collectibles.tryCollect(game.player.position, 1.5f);
+        // Try collecting items via AABB pickup (one at a time)
+        {
+            int idx = game.collectibles.tryPickup(
+                game.player.position, game.player.isCarrying);
+            if (idx >= 0) {
+                // Pick up the item: start carrying it
+                game.player.isCarrying = true;
+                game.player.carriedItemIndex = idx;
+                game.player.carryTimer = 0.0f;
+            }
+
+            // Update carry timer: auto-absorb after CARRY_DURATION
+            if (game.player.isCarrying) {
+                game.player.carryTimer += frameTime;
+                if (game.player.carryTimer >= CARRY_DURATION) {
+                    game.player.isCarrying = false;
+                    game.player.carriedItemIndex = -1;
+                }
+            }
+        }
 
         // Check win condition
         if (!game.won && game.collectibles.allCollected()) {
@@ -675,6 +693,17 @@ int main() {
             bool isMovingBack = keyS && !keyW;
             handRenderer.update(frameTime, isMoving, isJumping, isMovingBack);
             handRenderer.render(mainShader, aspect);
+        }
+
+        // Render carried collectible on top of player (after hands for visibility)
+        if (game.player.isCarrying &&
+            game.player.carriedItemIndex >= 0 &&
+            game.player.carriedItemIndex < (int)game.collectibles.getItems().size()) {
+            game.renderer.renderCarriedCollectible(
+                mainShader, view, projection,
+                game.player.position, game.player.getFront(),
+                sunDir, sunColor, ambientLevel, fogCol,
+                torchOn, torchPos, torchCol, torchRadius);
         }
 
         // HUD text

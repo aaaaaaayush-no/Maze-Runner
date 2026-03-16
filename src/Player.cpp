@@ -10,6 +10,9 @@ Player::Player()
     : position(0.0f)
     , yaw(-90.0f)
     , pitch(0.0f)
+    , isCarrying(false)
+    , carriedItemIndex(-1)
+    , carryTimer(0.0f)
     , moveSpeed(5.0f)
     , mouseSensitivity(0.1f)
     , cameraHeight(1.7f)
@@ -28,6 +31,9 @@ void Player::init(float startX, float startZ) {
     pitch = 0.0f;
     velocityY = 0.0f;
     onGround = true;
+    isCarrying = false;
+    carriedItemIndex = -1;
+    carryTimer = 0.0f;
 }
 
 void Player::processMouseMovement(float xOffset, float yOffset) {
