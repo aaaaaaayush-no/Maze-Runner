@@ -18,7 +18,8 @@ const std::vector<std::string> Renderer::GRAFFITI_FILES = {
     "graffiti_01.png",
     "graffiti_02.png",
     "graffiti_03.png",
-    "graffiti_04.png"
+    "graffiti_04.png",
+	"graffiti_05.png"
 };
 
 Renderer::Renderer()
