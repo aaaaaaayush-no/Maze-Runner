@@ -1,6 +1,7 @@
 #include "TitleScreen.h"
 #include <cmath>
 #include <cstring>
+#include <algorithm>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -427,12 +428,12 @@ void TitleScreen::drawDifficultySelector(std::vector<float>& verts, float time,
 
     // Show best stars for this difficulty
     if (sel < (int)bestStars.size()) {
-        int stars = bestStars[sel];
+        int stars = std::min(5, bestStars[sel]);
         float starPixel = 0.005f;
         std::string starStr;
-        for (int s = 0; s < 3; s++) {
+        for (int s = 0; s < 5; s++) {
             starStr += (s < stars) ? "O" : "-";
-            if (s < 2) starStr += " ";
+            if (s < 4) starStr += " ";
         }
         float starW = getTextWidth(starStr, starPixel);
         renderBlockText(verts, starStr, -starW / 2.0f, -0.1f, starPixel,
@@ -491,10 +492,16 @@ void TitleScreen::drawHighscores(std::vector<float>& verts, float time,
         int mins = totalSec / 60;
         int secs = totalSec % 60;
 
-        // Create entry string: "#1 - 8 ITEMS - 02:45"
-        char buf[64];
-        std::snprintf(buf, sizeof(buf), "#%d - %d ITEMS - %02d:%02d",
-                      i + 1, entry.collectables, mins, secs);
+        const char* difficultyName = "UNKNOWN";
+        if (entry.difficulty >= 0 && entry.difficulty <= 3) {
+            Difficulty d = static_cast<Difficulty>(entry.difficulty);
+            difficultyName = getDifficultyConfig(d).name;
+        }
+
+        // Create entry string: "#1 - EASY - 8 ITEMS - 02:45"
+        char buf[96];
+        std::snprintf(buf, sizeof(buf), "#%d - %s - %d ITEMS - %02d:%02d",
+                      i + 1, difficultyName, entry.collectables, mins, secs);
         std::string entryText = buf;
 
         float entryWidth = getTextWidth(entryText, entryPixel);

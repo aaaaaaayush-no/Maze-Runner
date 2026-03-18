@@ -170,15 +170,16 @@ struct HudRenderer {
         std::vector<float> verts;
 
         // Star positions: centered horizontally, above center
+        const int totalStars = 5;
         float starY = 0.25f; // NDC Y
-        float starSpacing = 0.15f;
-        float startX = -starSpacing; // 3 stars centered
+        float starSpacing = 0.12f;
+        float startX = -starSpacing * (totalStars - 1) * 0.5f;
 
         // Pixel radii converted to NDC
         float outerR = 30.0f / scrH * 2.0f;
         float innerR = 13.0f / scrH * 2.0f;
 
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < totalStars; i++) {
             float cx = startX + i * starSpacing;
             float cy = starY;
 
@@ -614,10 +615,13 @@ int main() {
             game.won = true;
             game.winScreenStartTime = currentTime;
 
-            // Calculate stars based on time and items collected
-            bool allCollected = game.collectibles.allCollected();
+            // Calculate stars based on time and collection progress
+            int totalCollectables = game.collectibles.getTotalCount();
+            int collected = game.collectibles.getDepositedCount();
             game.starResult = calculateStars(currentDifficulty,
-                                             game.elapsedTime, allCollected);
+                                             game.elapsedTime,
+                                             collected,
+                                             totalCollectables);
 
             // Save highscore
             if (!game.scoreSaved) {
@@ -627,7 +631,7 @@ int main() {
                 entry.score = game.boxesDelivered * 100;  // 100 points per box
                 entry.time = game.elapsedTime;
                 entry.difficulty = (int)currentDifficulty;
-                entry.collectables = game.boxesDelivered;
+                entry.collectables = collected;
                 entry.stars = game.starResult.stars;
                 entry.perfectRun = game.starResult.perfectRun ? 1 : 0;
                 addHighscore(HIGHSCORE_FILE, entry);
