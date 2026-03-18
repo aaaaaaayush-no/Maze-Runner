@@ -1,6 +1,6 @@
 # Maze Runner
 
-First-person 3D maze exploration game written in modern C++17 and rendered with OpenGL 3.3. The project features procedural maze generation, collectible stacking, a minimap with fog-of-war, animated HUD, day/night lighting, and CSV-based highscores.
+First-person 3D maze exploration game written in modern C++17 and rendered with OpenGL 3.3. The project features procedural maze generation, collectible stacking, animated HUD, day/night lighting, and CSV-based highscores.
 
 ![Maze Runner](https://img.shields.io/badge/OpenGL-3.3-blue) ![C++17](https://img.shields.io/badge/C%2B%2B-17-brightgreen)
 
@@ -8,7 +8,7 @@ First-person 3D maze exploration game written in modern C++17 and rendered with 
 
 - **Goal**: Escape the maze by reaching the exit gateway while collecting scattered items for a higher star rating and score.
 - **Perspective**: First-person only; mouse-look + WASD movement with jump.
-- **Key Systems**: Recursive-backtracking maze generation, collectible placement in dead-ends, stackable carried items, time-of-day sky/lighting, toggleable torch, minimap overlay with explored-cell tracking, difficulty-scaled timers, and persistent highscores.
+- **Key Systems**: Recursive-backtracking maze generation, collectible placement in dead-ends, stackable carried items, time-of-day sky/lighting, toggleable torch, difficulty-scaled timers, and persistent highscores.
 
 ## Technical Specifications
 
@@ -78,7 +78,6 @@ Shaders and textures are copied next to the executable at build time.
 - `Player.h/cpp` — first-person camera + movement; mouse look, WASD movement, jump, AABB wall collision, and carried-item bookkeeping.
 - `Renderer.h/cpp` — builds meshes (walls, gift boxes, graffiti batches, exit gateway, carried stack) and renders maze, collectibles, exit zone, and wireframe mode; generates procedural wall & graffiti textures; manages VAOs/VBOs and texture loading.
 - `Collectible.h/cpp` — item definitions, placement onto provided grid locations, rotation update, AABB pickup, and stacked-carry support.
-- `Minimap.h/cpp` — north-up overlay with fog-of-war, scrolling viewport, difficulty color accents, legend toggle, and markers for player/items/exit.
 - `TitleScreen.h/cpp` — animated title menu, difficulty selector, highscore list rendering, and start/quit handling.
 - `HandRenderer.h/cpp` — first-person hand mesh with walk/jump bob animation.
 - `SkyRenderer.h/cpp` — GPU sky dome with 90-second day/night cycle, sun/moon rendering, star field, and helpers for sun direction, sun color, fog color, and ambient light.
@@ -90,7 +89,6 @@ Shaders and textures are copied next to the executable at build time.
 
 ### Shaders (`shaders/`)
 - `vertex.glsl` / `fragment.glsl` — main 3D pipeline (MVP, lighting, fog, optional texture sampling, torch parameters).
-- `minimap_vertex.glsl` / `minimap_fragment.glsl` — 2D overlay for minimap and HUD quads.
 - `hud_vertex.glsl` / `hud_fragment.glsl` — text/stars/HUD rendering.
 
 ### Textures (`textures/`)
@@ -103,7 +101,6 @@ Shaders and textures are copied next to the executable at build time.
 - **Difficulty & Timing**: Four tiers scale maze size, item count, and target times; stars awarded based on completion time and whether all items were collected (perfect run = 3 stars + full collection).
 - **Collectibles**: Items spawn preferentially in dead-ends; pickups use generous AABB checks; collected items can be carried as a visible stack and contribute to score.
 - **Exit Zone**: 6×6 gateway platform with animated energy curtain and expanding light rings; crossing immediately ends the run.
-- **Minimap**: Shows explored cells, player arrow, collectible markers, exit marker, optional legend; scrolls smoothly for large mazes.
 - **Lighting**: Dynamic sky controls directional light color/dir, fog color, and ambient level; optional torch adds warm close-range light and a billboarded glow.
 - **HUD**: Timer, item counters, difficulty indicator, win-screen star animation, and CSV-backed highscore board on the title screen.
 
