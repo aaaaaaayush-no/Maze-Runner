@@ -16,7 +16,7 @@ First-person 3D maze exploration game written in modern C++17 and rendered with 
 - **Graphics**: OpenGL 3.3 core profile, GLSL 330 shaders
 - **Build System**: CMake 3.10+
 - **Dependencies**: GLFW 3.3+, GLM headers, GLAD loader (bundled)
-- **Physics**: 60 Hz fixed-step loop, gravity 9.8 m/s², jump impulse 4.5 m/s, corridor width 2.0 units
+- **Physics**: 60 Hz fixed-step loop, gravity 9.8 m/s², jump impulse 4.5 m/s (`Player.cpp`), corridor width 2.0 units
 - **Lighting**: Forward pipeline; directional sun/moon from a 90-second day/night cycle, exponential fog, optional torch glow (radius ~30 units with sine-wave flicker)
 - **Textures**: Procedural stone brick walls + graffiti decals; optional external PNG overrides (see `textures/`)
 - **Data**: Highscores saved as CSV (`highscores.txt`, top 10, backward compatible 5→7 columns)
