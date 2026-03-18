@@ -4,6 +4,7 @@
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <vector>
+#include <algorithm>
 
 #ifndef _USE_MATH_DEFINES
 #define _USE_MATH_DEFINES
@@ -43,29 +44,38 @@ inline DifficultyConfig getDifficultyConfig(Difficulty d) {
 
 // ── Star calculation ───────────────────────────────────────────────────────
 struct StarResult {
-    int stars;        // 1-3
-    bool perfectRun;  // all collectables + under 3-star time
+    int stars;        // 1-5
+    bool perfectRun;  // all collectables + fastest time tier
 };
 
 inline StarResult calculateStars(Difficulty diff, float timeSec,
-                                 bool allCollected) {
+                                 int collectedCount, int totalCount) {
     auto cfg = getDifficultyConfig(diff);
     StarResult result;
     result.perfectRun = false;
 
+    // Time-based stars (up to 3)
+    int timeStars = 1;
     if (timeSec < cfg.threeStar)
-        result.stars = 3;
+        timeStars = 3;
     else if (timeSec < cfg.twoStar)
-        result.stars = 2;
-    else
-        result.stars = 1;
+        timeStars = 2;
 
-    // Cap at 2 stars if not all collectables collected
-    if (!allCollected && result.stars > 2)
-        result.stars = 2;
+    // Collection-based stars (up to 2)
+    int collectionStars = 0;
+    if (totalCount > 0) {
+        float ratio = static_cast<float>(collectedCount) /
+                      static_cast<float>(totalCount);
+        if (ratio >= 1.0f)
+            collectionStars = 2;
+        else if (ratio >= 0.5f)
+            collectionStars = 1;
+    }
 
-    // Perfect run: all collected AND 3 stars
-    if (allCollected && result.stars == 3)
+    result.stars = std::min(5, timeStars + collectionStars);
+
+    // Perfect run: all collected AND fastest time tier (yields 5 stars)
+    if (totalCount > 0 && collectedCount >= totalCount && timeStars == 3)
         result.perfectRun = true;
 
     return result;

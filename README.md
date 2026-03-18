@@ -98,7 +98,7 @@ Shaders and textures are copied next to the executable at build time.
 
 ## Gameplay & Systems
 
-- **Difficulty & Timing**: Four tiers scale maze size, item count, and target times; stars awarded based on completion time and whether all items were collected (perfect run = 3 stars + full collection).
+- **Difficulty & Timing**: Four tiers scale maze size, item count, and target times; stars now use a 5-star scale combining completion time and collected items (perfect run = 5 stars with every item).
 - **Collectibles**: Items spawn preferentially in dead-ends; pickups use generous AABB checks; collected items can be carried as a visible stack and contribute to score.
 - **Exit Zone**: 6×6 gateway platform with animated energy curtain and expanding light rings; crossing immediately ends the run.
 - **Lighting**: Dynamic sky controls directional light color/dir, fog color, and ambient level; optional torch adds warm close-range light and a billboarded glow.
