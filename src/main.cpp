@@ -539,7 +539,7 @@ int main() {
             }
 
             hudShader.use();
-            titleScreen.render(screenWidth, screenHeight, currentTime, bestStars);
+            titleScreen.render(screenWidth, screenHeight, currentTime, bestStars, highscores);
 
             glfwSwapBuffers(window);
             glfwPollEvents();
@@ -749,15 +749,6 @@ int main() {
                            20, (float)screenHeight - 130, 12, 18,
                            0.6f, 0.6f, 0.8f,
                            screenWidth, screenHeight);
-
-            // Star preview per difficulty (bottom-left)
-            float previewY = 30.0f;
-            for (int d = 0; d < 4; d++) {
-                int bestStars = getBestStars(highscores, d);
-                float px = 20.0f + d * 80.0f;
-                hud.renderSmallStars(hudShader, px, previewY, bestStars, 3,
-                                     screenWidth, screenHeight);
-            }
 
             // Win screen
             if (game.won) {
