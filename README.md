@@ -17,7 +17,7 @@ First-person 3D maze exploration game written in modern C++17 and rendered with 
 - **Build System**: CMake 3.10+
 - **Dependencies**: GLFW 3.3+, GLM headers, GLAD loader (bundled)
 - **Physics**: 60 Hz fixed-step loop, gravity 9.8 m/s², jump impulse controlled by `jumpForce` in `Player.cpp`, corridor width 2.0 units
-- **Lighting**: Forward pipeline; directional sun/moon from a 90-second day/night cycle, exponential fog, optional torch glow (radius ~30 units with sine wave flicker)
+- **Lighting**: Forward pipeline; directional sun/moon from a 90-second day/night cycle, exponential fog, optional torch glow (radius ~30 units with sine-wave flicker)
 - **Textures**: Procedural stone brick walls + graffiti decals; optional external PNG overrides (see `textures/`)
 - **Data**: Highscores saved as CSV (`highscores.txt`, top 10, backward compatible 5→7 columns)
 
@@ -100,7 +100,7 @@ Shaders and textures are copied next to the executable at build time.
 
 ## Gameplay & Systems
 
-- **Difficulty & Timing**: Four tiers scale maze size, item count, and target times; stars awarded based on completion time and whether all items were collected (perfect run = 3 stars + full collection).
+- **Difficulty & Timing**: Four tiers scale maze size, item count, and target times; stars awarded based on completion time and whether all items were collected (perfect run requires collecting everything within the 3-star time).
 - **Collectibles**: Items spawn preferentially in dead-ends; pickups use generous AABB checks; collected items can be carried as a visible stack and contribute to score.
 - **Exit Zone**: 6×6 gateway platform with animated energy curtain and expanding light rings; crossing immediately ends the run.
 - **Minimap**: Shows explored cells, player arrow, collectible markers, exit marker, optional legend; scrolls smoothly for large mazes.
