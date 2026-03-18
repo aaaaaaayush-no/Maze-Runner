@@ -94,6 +94,7 @@ Shaders and textures are copied next to the executable at build time.
 ### Textures (`textures/`)
 - `gift_box.png` — default giftbox texture; also used for stacked carried items.
 - `graffiti/` — optional PNG decals (`graffiti_01.png` …) mixed with procedural graffiti when absent.
+- (Optional) `ground.png` — overrides the procedural grass floor texture.
 - (Optional) Place a `textures/wall.png` next to the executable to override the procedural stone texture.
 
 ## Gameplay & Systems

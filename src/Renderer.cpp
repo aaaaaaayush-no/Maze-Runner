@@ -3,6 +3,7 @@
 #include "Collectible.h"
 #include "Shader.h"
 #include <glm/gtc/matrix_transform.hpp>
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <string>
@@ -24,11 +25,12 @@ const std::vector<std::string> Renderer::GRAFFITI_FILES = {
 
 Renderer::Renderer()
     : mazeVAO(0), mazeVBO(0), mazeVertexCount(0)
+    , groundVAO(0), groundVBO(0), groundVertexCount(0)
     , cubeVAO(0), cubeVBO(0), cubeVertexCount(0)
     , pyramidVAO(0), pyramidVBO(0), pyramidVertexCount(0)
     , sphereVAO(0), sphereVBO(0), sphereVertexCount(0)
     , giftBoxVAO(0), giftBoxVBO(0), giftBoxVertexCount(0), giftBoxTextureID(0)
-    , wallTextureID(0)
+    , wallTextureID(0), groundTextureID(0)
     , graffitiVAO(0), graffitiVBO(0), graffitiVertexCount(0)
     , scratchVAO(0), scratchVBO(0)
     , wireframe(false)
@@ -37,12 +39,14 @@ Renderer::Renderer()
 
 Renderer::~Renderer() {
     if (mazeVAO) { glDeleteVertexArrays(1, &mazeVAO); glDeleteBuffers(1, &mazeVBO); }
+    if (groundVAO) { glDeleteVertexArrays(1, &groundVAO); glDeleteBuffers(1, &groundVBO); }
     if (cubeVAO) { glDeleteVertexArrays(1, &cubeVAO); glDeleteBuffers(1, &cubeVBO); }
     if (pyramidVAO) { glDeleteVertexArrays(1, &pyramidVAO); glDeleteBuffers(1, &pyramidVBO); }
     if (sphereVAO) { glDeleteVertexArrays(1, &sphereVAO); glDeleteBuffers(1, &sphereVBO); }
     if (giftBoxVAO) { glDeleteVertexArrays(1, &giftBoxVAO); glDeleteBuffers(1, &giftBoxVBO); }
     if (giftBoxTextureID) { glDeleteTextures(1, &giftBoxTextureID); }
     if (wallTextureID) { glDeleteTextures(1, &wallTextureID); }
+    if (groundTextureID) { glDeleteTextures(1, &groundTextureID); }
     if (graffitiVAO) { glDeleteVertexArrays(1, &graffitiVAO); glDeleteBuffers(1, &graffitiVBO); }
     for (auto id : graffitiTextureIDs) {
         if (id) glDeleteTextures(1, &id);
@@ -52,6 +56,7 @@ Renderer::~Renderer() {
 
 void Renderer::init() {
     generateWallTexture();
+    generateGroundTexture();
     generateGiftBoxTexture();
     generateGraffitiTextures();
     buildCubeMesh();
@@ -175,7 +180,8 @@ void Renderer::addCube(std::vector<float>& verts,
 }
 
 void Renderer::buildMazeMesh(const Maze& maze) {
-    std::vector<float> verts;
+    std::vector<float> wallVerts;
+    std::vector<float> groundVerts;
 
     int w = maze.getWidth();
     int h = maze.getHeight();
@@ -205,7 +211,7 @@ void Renderer::buildMazeMesh(const Maze& maze) {
                     // Standard stone brick
                     wr = 0.45f + variation; wg = 0.43f + variation; wb = 0.40f + variation;
                 }
-                addCubeTextured(verts, wx, 0.0f, wz, CELL_SIZE, WALL_HEIGHT, CELL_SIZE,
+                addCubeTextured(wallVerts, wx, 0.0f, wz, CELL_SIZE, WALL_HEIGHT, CELL_SIZE,
                         wr, wg, wb);
             } else {
                 // Minecraft grass block floor
@@ -219,7 +225,7 @@ void Renderer::buildMazeMesh(const Maze& maze) {
                 float fb = 0.18f + fvar * 0.3f;
 
                 // Floor (textured)
-                pushQuadUV(verts,
+                pushQuadUV(groundVerts,
                     wx,         0.0f, wz,
                     wx+CELL_SIZE, 0.0f, wz,
                     wx+CELL_SIZE, 0.0f, wz+CELL_SIZE,
@@ -228,7 +234,7 @@ void Renderer::buildMazeMesh(const Maze& maze) {
                     0.0f, 1.0f, 0.0f,
                     0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f);
                 // Ceiling (dark stone, textured)
-                pushQuadUV(verts,
+                pushQuadUV(wallVerts,
                     wx,         WALL_HEIGHT, wz+CELL_SIZE,
                     wx+CELL_SIZE, WALL_HEIGHT, wz+CELL_SIZE,
                     wx+CELL_SIZE, WALL_HEIGHT, wz,
@@ -241,16 +247,40 @@ void Renderer::buildMazeMesh(const Maze& maze) {
     }
 
     // Stride is 11 floats: pos(3) + color(3) + normal(3) + texcoord(2)
-    mazeVertexCount = (int)(verts.size() / 11);
+    mazeVertexCount = (int)(wallVerts.size() / 11);
+    groundVertexCount = (int)(groundVerts.size() / 11);
 
     if (mazeVAO) { glDeleteVertexArrays(1, &mazeVAO); glDeleteBuffers(1, &mazeVBO); }
+    if (groundVAO) { glDeleteVertexArrays(1, &groundVAO); glDeleteBuffers(1, &groundVBO); }
 
     glGenVertexArrays(1, &mazeVAO);
     glGenBuffers(1, &mazeVBO);
 
     glBindVertexArray(mazeVAO);
     glBindBuffer(GL_ARRAY_BUFFER, mazeVBO);
-    glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(float), verts.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, wallVerts.size() * sizeof(float), wallVerts.data(), GL_STATIC_DRAW);
+
+    // Position
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    // Color
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    // Normal
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(float), (void*)(6 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    // TexCoord
+    glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, 11 * sizeof(float), (void*)(9 * sizeof(float)));
+    glEnableVertexAttribArray(3);
+
+    glBindVertexArray(0);
+
+    glGenVertexArrays(1, &groundVAO);
+    glGenBuffers(1, &groundVBO);
+
+    glBindVertexArray(groundVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, groundVBO);
+    glBufferData(GL_ARRAY_BUFFER, groundVerts.size() * sizeof(float), groundVerts.data(), GL_STATIC_DRAW);
 
     // Position
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 11 * sizeof(float), (void*)0);
@@ -331,6 +361,70 @@ void Renderer::generateWallTexture() {
                     pixels[idx + 1] = (unsigned char)(base_g < 0 ? 0 : (base_g > 255 ? 255 : base_g));
                     pixels[idx + 2] = (unsigned char)(base_b < 0 ? 0 : (base_b > 255 ? 255 : base_b));
                 }
+            }
+        }
+
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, TEX_SIZE, TEX_SIZE, 0,
+                     GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+    }
+
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    // Use nearest-neighbor filtering for pixelated Minecraft look
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void Renderer::generateGroundTexture() {
+    glGenTextures(1, &groundTextureID);
+    glBindTexture(GL_TEXTURE_2D, groundTextureID);
+
+    // Try loading an external texture from textures/ground.png
+    int imgW, imgH, imgChannels;
+    unsigned char* data = stbi_load("textures/ground.png", &imgW, &imgH, &imgChannels, 3);
+    if (data) {
+        std::cerr << "Loaded ground texture from textures/ground.png ("
+                  << imgW << "x" << imgH << ")\n";
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, imgW, imgH, 0,
+                     GL_RGB, GL_UNSIGNED_BYTE, data);
+        stbi_image_free(data);
+    } else {
+        std::cerr << "textures/ground.png not found, using procedural texture\n";
+
+        const int TEX_SIZE = 128;
+        std::vector<unsigned char> pixels(TEX_SIZE * TEX_SIZE * 3);
+
+        for (int y = 0; y < TEX_SIZE; y++) {
+            for (int x = 0; x < TEX_SIZE; x++) {
+                unsigned int h = (unsigned int)(x * 92821 + y * 68917);
+                h = ((h >> 16) ^ h) * 0x45d9f3b;
+                h = (h >> 16) ^ h;
+                int noise = (int)(h % 30) - 15;
+
+                // Patchy darker dirt blotches every ~8px
+                unsigned int patchHash = (unsigned int)((x / 8) * 131 + (y / 8) * 479);
+                patchHash = ((patchHash >> 16) ^ patchHash) * 0x45d9f3b;
+                bool dirtPatch = (patchHash % 11) == 0;
+
+                int base_r = dirtPatch ? 95 : 70;
+                int base_g = dirtPatch ? 85 : 130;
+                int base_b = dirtPatch ? 55 : 70;
+
+                // Subtle vertical streaks to mimic blades of grass
+                int blade = (int)((std::sin((float)x * 0.25f) + 1.0f) * 6.0f);
+
+                base_r = base_r + noise / 2;
+                base_g = base_g + noise + blade;
+                base_b = base_b + noise / 3;
+
+                int idx = (y * TEX_SIZE + x) * 3;
+                pixels[idx + 0] = (unsigned char)(std::clamp(base_r, 0, 255));
+                pixels[idx + 1] = (unsigned char)(std::clamp(base_g, 0, 255));
+                pixels[idx + 2] = (unsigned char)(std::clamp(base_b, 0, 255));
             }
         }
 
@@ -835,11 +929,20 @@ void Renderer::renderMaze(Shader& shader, const glm::mat4& view, const glm::mat4
     setLightingUniforms(shader, sunDir, sunColor, ambientLevel, fogCol,
                         torchEnabled, torchPos, torchColor, torchRadius);
 
-    // Bind wall texture
+    // Draw ground with dedicated texture
     shader.setBool("useTexture", true);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, wallTextureID);
+    glBindTexture(GL_TEXTURE_2D, groundTextureID);
     shader.setInt("wallTexture", 0);
+
+    if (groundVAO && groundVertexCount > 0) {
+        glBindVertexArray(groundVAO);
+        glDrawArrays(GL_TRIANGLES, 0, groundVertexCount);
+        glBindVertexArray(0);
+    }
+
+    // Bind wall texture for walls/ceilings
+    glBindTexture(GL_TEXTURE_2D, wallTextureID);
 
     glBindVertexArray(mazeVAO);
     glDrawArrays(GL_TRIANGLES, 0, mazeVertexCount);
