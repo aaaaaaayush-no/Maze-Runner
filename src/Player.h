@@ -15,9 +15,6 @@ public:
     // Stack of carried collectible indices (into Collectible::items)
     std::vector<int> carriedItems;
 
-    // Third-person perspective toggle
-    bool thirdPerson;
-
     Player();
 
     void init(float startX, float startZ);
@@ -42,18 +39,7 @@ private:
     float jumpForce;
     bool onGround;
 
-    // Third-person camera state
-    mutable glm::vec3 currentCameraPos;
-    mutable bool cameraInitialized;
-    float cameraDistance;
-    float cameraHeight3P;
-    float cameraFollowSpeed;
-    float cameraMinDistance;
-    float cameraMaxDistance;
-
     bool checkCollision(const glm::vec3& pos, const Maze& maze) const;
-    glm::vec3 calculateDesiredCameraPosition() const;
-    bool checkCameraObstruction(const glm::vec3& from, const glm::vec3& to, const Maze& maze) const;
 };
 
 #endif

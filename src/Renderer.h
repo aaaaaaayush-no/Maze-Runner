@@ -50,15 +50,6 @@ public:
                                   bool torchEnabled, const glm::vec3& torchPos,
                                   const glm::vec3& torchColor, float torchRadius);
 
-    // Render the player model (for third-person view)
-    void renderPlayer(Shader& shader, const glm::mat4& view,
-                      const glm::mat4& projection,
-                      const glm::vec3& playerPos, float yaw,
-                      const glm::vec3& sunDir, const glm::vec3& sunColor,
-                      float ambientLevel, const glm::vec3& fogCol,
-                      bool torchEnabled, const glm::vec3& torchPos,
-                      const glm::vec3& torchColor, float torchRadius);
-
     void setWireframe(bool enabled);
 
 private:
@@ -103,9 +94,8 @@ private:
     static const std::vector<std::string> GRAFFITI_FILES;
     static constexpr float GRAFFITI_CHANCE = 0.05f; // 5% chance per eligible wall face
 
-    // Dynamic scratch buffers for cauldron and player rendering
+    // Dynamic scratch buffers for cauldron rendering
     unsigned int scratchVAO, scratchVBO;
-    unsigned int playerScratchVAO, playerScratchVBO;
 
     bool wireframe;
 
