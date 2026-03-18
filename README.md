@@ -17,7 +17,7 @@ First-person 3D maze exploration game written in modern C++17 and rendered with 
 - **Build System**: CMake 3.10+
 - **Dependencies**: GLFW 3.3+, GLM headers, GLAD loader (bundled)
 - **Physics**: 60 Hz fixed-step loop, gravity 9.8 m/s², jump impulse controlled by `jumpForce` in `Player.cpp`, corridor width 2.0 units
-- **Lighting**: Forward pipeline; directional sun/moon from a 90-second day/night cycle, exponential fog, optional torch glow (radius ~30 units with sine-wave flicker)
+- **Lighting**: Forward pipeline; directional sun/moon from a 90-second day/night cycle, exponential fog, optional torch glow (radius ~30 units with sine wave flicker)
 - **Textures**: Procedural stone brick walls + graffiti decals; optional external PNG overrides (see `textures/`)
 - **Data**: Highscores saved as CSV (`highscores.txt`, top 10, backward compatible 5→7 columns)
 
@@ -114,7 +114,7 @@ Shaders and textures are copied next to the executable at build time.
   - Maze scale & item counts: `getDifficultyConfig` in `StarRating.h`.
   - Movement/physics: `moveSpeed`, `gravity`, `jumpForce` in `Player.cpp`.
   - Torch color/radius: `baseColor` and `radius` in `TorchLight.cpp`.
-  - Day/night speed: `DAY_CYCLE_SPEED` in `SkyRenderer.h` (default: full cycle in 90s).
+  - Day/night speed: `DAY_CYCLE_SPEED` in `SkyRenderer.h` (default: full cycle in 90 seconds).
 
 ## Notes
 
