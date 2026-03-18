@@ -305,8 +305,8 @@ struct HudRenderer {
                        int scrW, int scrH) {
         float marginPx = 20.0f;
         float radiusPx = 90.0f;
-        float cellPx   = 12.0f;
-        int viewRadiusCells = (int)std::floor(radiusPx / cellPx);
+        float cellPixelSize = 12.0f;
+        int viewRadiusCells = (int)std::floor(radiusPx / cellPixelSize);
 
         float centerPxX = scrW - radiusPx - marginPx;
         float centerPxY = scrH - radiusPx - marginPx;
@@ -334,14 +334,14 @@ struct HudRenderer {
 
         // Circle mask / background
         std::vector<float> verts;
-        int segments = 48;
+        const int circleSegments = 48;
         glStencilFunc(GL_ALWAYS, 1, 0xFF);
         glStencilOp(GL_REPLACE, GL_REPLACE, GL_REPLACE);
         float cxPx = centerPxX;
         float cyPx = centerPxY;
-        for (int i = 0; i < segments; i++) {
-            float a0 = (float)i / segments * 2.0f * M_PI;
-            float a1 = (float)(i + 1) / segments * 2.0f * M_PI;
+        for (int i = 0; i < circleSegments; i++) {
+            float a0 = (float)i / circleSegments * 2.0f * M_PI;
+            float a1 = (float)(i + 1) / circleSegments * 2.0f * M_PI;
             float x0 = cxPx + std::cos(a0) * radiusPx;
             float y0 = cyPx + std::sin(a0) * radiusPx;
             float x1 = cxPx + std::cos(a1) * radiusPx;
@@ -390,9 +390,9 @@ struct HudRenderer {
                 bool wall = maze.isWall(cx, cy);
                 float intensity = wall ? 0.25f : 0.55f;
 
-                float px = centerPxX + dx * cellPx;
-                float py = centerPxY - dy * cellPx;
-                float half = cellPx * 0.45f;
+                float px = centerPxX + dx * cellPixelSize;
+                float py = centerPxY - dy * cellPixelSize;
+                float half = cellPixelSize * 0.45f;
                 pushQuadPx(verts,
                            px - half, py - half,
                            px + half, py + half,
@@ -407,9 +407,9 @@ struct HudRenderer {
         float exitDy = exitCellY - playerCellY;
         if (std::abs(exitDx) <= viewRadiusCells + 0.5f &&
             std::abs(exitDy) <= viewRadiusCells + 0.5f) {
-            float px = centerPxX + exitDx * cellPx;
-            float py = centerPxY - exitDy * cellPx;
-            float half = cellPx * 0.35f;
+            float px = centerPxX + exitDx * cellPixelSize;
+            float py = centerPxY - exitDy * cellPixelSize;
+            float half = cellPixelSize * 0.35f;
             pushQuadPx(verts,
                        px - half, py - half,
                        px + half, py + half,
@@ -422,9 +422,8 @@ struct HudRenderer {
         }
 
         // Player arrow (north-up; yaw rotates arrow only)
-        glm::vec2 dir(std::cos(glm::radians(playerYaw)), -std::sin(glm::radians(playerYaw)));
-        if (glm::length(dir) < 0.0001f) dir = glm::vec2(0.0f, 1.0f);
-        dir = glm::normalize(dir);
+        glm::vec2 dir = glm::normalize(glm::vec2(std::cos(glm::radians(playerYaw)),
+                                                 -std::sin(glm::radians(playerYaw))));
         glm::vec2 perp(-dir.y, dir.x);
         float arrowLen = 12.0f;
         float arrowWidth = 6.0f;
