@@ -1,6 +1,6 @@
 # Maze Runner
 
-A 3D maze exploration game built with OpenGL 3.3, featuring procedural generation, physics simulation, collectible items, a minimap system, difficulty levels and a star rating system. Supports both **first-person and third-person camera views** with smooth camera following.
+A 3D maze exploration game built with OpenGL 3.3, featuring procedural generation, physics simulation, collectible items, a minimap system, difficulty levels and a star rating system.
 
 ![Maze Runner](https://img.shields.io/badge/OpenGL-3.3-blue) ![C++17](https://img.shields.io/badge/C%2B%2B-17-brightgreen)
 
@@ -8,7 +8,6 @@ A 3D maze exploration game built with OpenGL 3.3, featuring procedural generatio
 
 - **Procedural Maze Generation** – Recursive backtracking algorithm creates a unique maze every game
 - **Difficulty Levels** – EASY (15×15), MEDIUM (21×21), HARD (31×31) and NIGHTMARE (41×41) with scaled item counts and time thresholds
-- **First-Person & Third-Person Views** – Toggle between camera modes; first-person for immersive exploration, third-person with smooth following to see your character and carried items
 - **3D Rendering** – Textured geometry with procedural stone-brick wall textures, warm torch lighting, exponential fog, wireframe toggle
 - **Physics** – Gravity (9.8 m/s²) and jump mechanics with AABB wall collision
 - **Minimap** – North-up top-right overlay with fog-of-war, compass rose, player arrow, item markers and exit indicator; scrolling viewport for larger mazes
@@ -30,7 +29,6 @@ A 3D maze exploration game built with OpenGL 3.3, featuring procedural generatio
 | **D** | Move right |
 | **Mouse** | Look around (camera control) |
 | **Space** | Jump |
-| **V** | Toggle between first-person and third-person view |
 | **T** | Toggle torch light on/off |
 | **R** | Restart with a new maze |
 | **F1** | Toggle wireframe rendering |
@@ -44,18 +42,6 @@ A 3D maze exploration game built with OpenGL 3.3, featuring procedural generatio
 | **← / →** | Adjust difficulty selection |
 | **Enter** | Confirm selection |
 | **ESC** | Quit game |
-
-## Camera Views
-
-The game supports **two camera modes** that you can toggle between using the **V** key:
-
-- **First-Person View (Default)** – Camera positioned at eye level for immersive maze exploration. Only your hands are visible in this mode.
-- **Third-Person View** – Camera positioned behind and above your character with smooth interpolation following. The camera maintains a comfortable viewing distance (2-6 units) and smoothly tracks your movements, allowing you to see your player model and the stack of collectible items you're carrying.
-
-The third-person camera features:
-- Smooth lerp-based following for natural movement
-- Automatic distance constraints to prevent clipping
-- Proper positioning behind the player using the camera's forward direction
 
 ## Requirements
 
@@ -126,7 +112,7 @@ cd build
 └── src/
     ├── main.cpp           # Game loop, input, HUD, win logic
     ├── Maze.h/cpp         # Procedural maze generation & storage
-    ├── Player.h/cpp       # Camera system (first-person/third-person), movement, physics
+    ├── Player.h/cpp       # Camera system, movement, physics
     ├── Renderer.h/cpp     # OpenGL rendering pipeline & procedural textures
     ├── Minimap.h/cpp      # 2D minimap overlay with fog of war
     ├── Collectible.h/cpp  # Item placement & collection
@@ -144,7 +130,7 @@ cd build
 |-----------|---------------|
 | Maze algorithm | Recursive backtracking on an odd-dimensioned grid |
 | Difficulty | 4 tiers (EASY–NIGHTMARE) scaling maze size, items and time thresholds |
-| Camera | First-person (eye-level) and third-person (behind/above shoulder) modes with smooth lerp following; toggleable with V key |
+| Camera | First-person view at eye level |
 | Rendering | VBO/VAO with per-vertex position + color + normal + texcoord (stride 11 floats for maze, 9 for objects) |
 | Textures | Procedural 128×128 stone-brick wall texture and 64×64 graffiti decals generated at init; external PNGs loaded when present; `useTexture` uniform toggles sampling in fragment shader |
 | Shading | Directional light (Gouraud) + exponential fog + warm torch tint |

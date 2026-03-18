@@ -41,7 +41,6 @@ static bool keySpace = false;
 static bool requestRestart = false;
 static bool requestWireToggle = false;
 static bool requestTorchToggle = false;
-static bool requestTPPToggle = false;
 
 static Difficulty currentDifficulty = Difficulty::MEDIUM;
 static GameScreen currentScreen = GameScreen::TITLE_SCREEN;
@@ -355,7 +354,6 @@ static void keyCallback(GLFWwindow* window, int key, int /*scancode*/, int actio
         case GLFW_KEY_R:  if (down) requestRestart = true; break;
         case GLFW_KEY_F1: if (down) requestWireToggle = true; break;
         case GLFW_KEY_T:  if (down) requestTorchToggle = true; break;
-        case GLFW_KEY_V:  if (down) requestTPPToggle = true; break;
         case GLFW_KEY_ESCAPE:
             if (currentScreen == GameScreen::PLAYING) {
                 currentScreen = GameScreen::TITLE_SCREEN;
@@ -565,10 +563,6 @@ int main() {
             torchLight.toggle();
             requestTorchToggle = false;
         }
-        if (requestTPPToggle) {
-            game.player.thirdPerson = !game.player.thirdPerson;
-            requestTPPToggle = false;
-        }
 
         // Fixed timestep physics
         if (!game.won) {
@@ -700,23 +694,12 @@ int main() {
         // Torch glow sprite
         torchLight.renderGlow(mainShader, view, projection);
 
-        // Update and render first-person hands (only in FPP)
-        if (!game.player.thirdPerson) {
-            bool isMoving = keyW || keyA || keyS || keyD;
-            bool isJumping = !game.player.isOnGround();
-            bool isMovingBack = keyS && !keyW;
-            handRenderer.update(frameTime, isMoving, isJumping, isMovingBack);
-            handRenderer.render(mainShader, aspect);
-        }
-
-        // Render player model in third-person view
-        if (game.player.thirdPerson) {
-            game.renderer.renderPlayer(
-                mainShader, view, projection,
-                game.player.position, game.player.yaw,
-                sunDir, sunColor, ambientLevel, fogCol,
-                torchOn, torchPos, torchCol, torchRadius);
-        }
+        // Update and render first-person hands
+        bool isMoving = keyW || keyA || keyS || keyD;
+        bool isJumping = !game.player.isOnGround();
+        bool isMovingBack = keyS && !keyW;
+        handRenderer.update(frameTime, isMoving, isJumping, isMovingBack);
+        handRenderer.render(mainShader, aspect);
 
         // Render carried collectibles stacked in the player's hands
         if (!game.player.carriedItems.empty()) {
@@ -766,14 +749,6 @@ int main() {
                            20, (float)screenHeight - 130, 12, 18,
                            0.6f, 0.6f, 0.8f,
                            screenWidth, screenHeight);
-
-            // TPP mode indicator
-            if (game.player.thirdPerson) {
-                hud.renderText(hudShader, "TPP",
-                               (float)screenWidth - 80, (float)screenHeight - 40, 12, 18,
-                               0.8f, 0.8f, 0.2f,
-                               screenWidth, screenHeight);
-            }
 
             // Star preview per difficulty (bottom-left)
             float previewY = 30.0f;

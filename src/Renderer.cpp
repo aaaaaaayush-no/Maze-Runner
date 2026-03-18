@@ -31,7 +31,6 @@ Renderer::Renderer()
     , wallTextureID(0)
     , graffitiVAO(0), graffitiVBO(0), graffitiVertexCount(0)
     , scratchVAO(0), scratchVBO(0)
-    , playerScratchVAO(0), playerScratchVBO(0)
     , wireframe(false)
 {
 }
@@ -49,7 +48,6 @@ Renderer::~Renderer() {
         if (id) glDeleteTextures(1, &id);
     }
     if (scratchVAO) { glDeleteVertexArrays(1, &scratchVAO); glDeleteBuffers(1, &scratchVBO); }
-    if (playerScratchVAO) { glDeleteVertexArrays(1, &playerScratchVAO); glDeleteBuffers(1, &playerScratchVBO); }
 }
 
 void Renderer::init() {
@@ -60,11 +58,9 @@ void Renderer::init() {
     buildPyramidMesh();
     buildSphereMesh();
     buildGiftBoxMesh();
-    // Create scratch VAOs for cauldron and player rendering
+    // Create scratch VAO for cauldron rendering
     glGenVertexArrays(1, &scratchVAO);
     glGenBuffers(1, &scratchVBO);
-    glGenVertexArrays(1, &playerScratchVAO);
-    glGenBuffers(1, &playerScratchVBO);
 }
 
 void Renderer::setWireframe(bool enabled) {
@@ -1193,83 +1189,4 @@ void Renderer::renderExitZone(Shader& shader, const glm::mat4& view,
                      0.4f * ringPulse, 0.7f * ringPulse, 0.9f * ringPulse);
         }
     }
-}
-
-
-void Renderer::renderPlayer(Shader& shader, const glm::mat4& view,
-                            const glm::mat4& projection,
-                            const glm::vec3& playerPos, float yaw,
-                            const glm::vec3& sunDir, const glm::vec3& sunColor,
-                            float ambientLevel, const glm::vec3& fogCol,
-                            bool torchEnabled, const glm::vec3& torchPos,
-                            const glm::vec3& torchColor, float torchRadius) {
-    shader.use();
-    shader.setMat4("view", view);
-    shader.setMat4("projection", projection);
-    setLightingUniforms(shader, sunDir, sunColor, ambientLevel, fogCol,
-                        torchEnabled, torchPos, torchColor, torchRadius);
-    shader.setBool("useTexture", false);
-    shader.setBool("enableEdgeOutline", false);
-
-    // playerPos is at eye height (1.7 units above ground)
-    // foot level = playerPos.y - cameraHeight (1.7)
-    float footY = playerPos.y - 1.7f;
-
-    // Helper: draw a box at world position with given half-extents and color
-    auto drawBox = [&](glm::vec3 center, glm::vec3 scale, float r, float g, float b) {
-        std::vector<float> v;
-        addCube(v, -0.5f, -0.5f, -0.5f, scale.x, scale.y, scale.z, r, g, b);
-        glBindVertexArray(playerScratchVAO);
-        glBindBuffer(GL_ARRAY_BUFFER, playerScratchVBO);
-        glBufferData(GL_ARRAY_BUFFER, v.size() * sizeof(float), v.data(), GL_DYNAMIC_DRAW);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 9*sizeof(float), (void*)0);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 9*sizeof(float), (void*)(3*sizeof(float)));
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 9*sizeof(float), (void*)(6*sizeof(float)));
-        glEnableVertexAttribArray(2);
-
-        glm::mat4 model = glm::translate(glm::mat4(1.0f), center);
-        model = glm::rotate(model, glm::radians(yaw + 90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-        shader.setMat4("model", model);
-        glDrawArrays(GL_TRIANGLES, 0, (int)(v.size() / 9));
-        glBindVertexArray(0);
-    };
-
-    // Legs (two blocks)
-    float legW = 0.22f, legH = 0.55f, legD = 0.22f;
-    drawBox(glm::vec3(playerPos.x, footY + legH * 0.5f, playerPos.z) + glm::vec3( 0.12f, 0.0f, 0.0f),
-            glm::vec3(legW, legH, legD), 0.20f, 0.25f, 0.65f); // left leg (blue)
-    drawBox(glm::vec3(playerPos.x, footY + legH * 0.5f, playerPos.z) + glm::vec3(-0.12f, 0.0f, 0.0f),
-            glm::vec3(legW, legH, legD), 0.20f, 0.25f, 0.65f); // right leg
-
-    // Body (torso)
-    float bodyW = 0.50f, bodyH = 0.65f, bodyD = 0.28f;
-    float bodyY = footY + legH + bodyH * 0.5f;
-    drawBox(glm::vec3(playerPos.x, bodyY, playerPos.z),
-            glm::vec3(bodyW, bodyH, bodyD), 0.20f, 0.55f, 0.25f); // green shirt
-
-    // Arms
-    float armW = 0.18f, armH = 0.58f, armD = 0.18f;
-    float armY = footY + legH + armH * 0.5f + 0.05f;
-    float armOff = (bodyW + armW) * 0.5f;
-    drawBox(glm::vec3(playerPos.x, armY, playerPos.z) + glm::vec3( armOff, 0.0f, 0.0f),
-            glm::vec3(armW, armH, armD), 0.80f, 0.60f, 0.45f); // skin
-    drawBox(glm::vec3(playerPos.x, armY, playerPos.z) + glm::vec3(-armOff, 0.0f, 0.0f),
-            glm::vec3(armW, armH, armD), 0.80f, 0.60f, 0.45f);
-
-    // Head (rectangular, wider than body)
-    float headW = 0.58f, headH = 0.45f, headD = 0.48f;
-    float headY = footY + legH + bodyH + headH * 0.5f;
-    drawBox(glm::vec3(playerPos.x, headY, playerPos.z),
-            glm::vec3(headW, headH, headD), 0.80f, 0.60f, 0.45f); // skin tone
-
-    // Eyes (two small dark blocks on front face)
-    float eyeW = 0.08f, eyeH = 0.07f, eyeD = 0.05f;
-    float eyeY = headY + 0.05f;
-    float eyeOff = 0.13f;
-    drawBox(glm::vec3(playerPos.x, eyeY, playerPos.z) + glm::vec3( eyeOff, 0.0f, headD * 0.5f),
-            glm::vec3(eyeW, eyeH, eyeD), 0.10f, 0.10f, 0.10f);
-    drawBox(glm::vec3(playerPos.x, eyeY, playerPos.z) + glm::vec3(-eyeOff, 0.0f, headD * 0.5f),
-            glm::vec3(eyeW, eyeH, eyeD), 0.10f, 0.10f, 0.10f);
 }
