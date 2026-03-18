@@ -298,6 +298,162 @@ struct HudRenderer {
         glEnable(GL_DEPTH_TEST);
         glBindVertexArray(0);
     }
+
+    void renderMinimap(Shader& hudShader, const Maze& maze,
+                       const glm::vec3& playerPos, float playerYaw,
+                       const glm::vec3& exitWorldPos,
+                       int scrW, int scrH) {
+        float marginPx = 20.0f;
+        float radiusPx = 90.0f;
+        float cellPx   = 12.0f;
+        int viewRadiusCells = (int)std::floor(radiusPx / cellPx);
+
+        float centerPxX = scrW - radiusPx - marginPx;
+        float centerPxY = scrH - radiusPx - marginPx;
+
+        auto pushQuadPx = [&](std::vector<float>& v, float x0, float y0, float x1, float y1,
+                              float r, float g, float b) {
+            float ndcX0 = (x0 / scrW) * 2.0f - 1.0f;
+            float ndcX1 = (x1 / scrW) * 2.0f - 1.0f;
+            float ndcY0 = (y0 / scrH) * 2.0f - 1.0f;
+            float ndcY1 = (y1 / scrH) * 2.0f - 1.0f;
+            pushQuad(v, ndcX0, ndcY0, ndcX1, ndcY1, r, g, b);
+        };
+
+        auto toNdc = [&](float px, float py) {
+            float ndcX = (px / scrW) * 2.0f - 1.0f;
+            float ndcY = (py / scrH) * 2.0f - 1.0f;
+            return std::pair<float,float>(ndcX, ndcY);
+        };
+
+        glDisable(GL_DEPTH_TEST);
+        glEnable(GL_STENCIL_TEST);
+        glStencilMask(0xFF);
+        glClearStencil(0);
+        glClear(GL_STENCIL_BUFFER_BIT);
+
+        // Circle mask / background
+        std::vector<float> verts;
+        int segments = 48;
+        glStencilFunc(GL_ALWAYS, 1, 0xFF);
+        glStencilOp(GL_REPLACE, GL_REPLACE, GL_REPLACE);
+        float cxPx = centerPxX;
+        float cyPx = centerPxY;
+        for (int i = 0; i < segments; i++) {
+            float a0 = (float)i / segments * 2.0f * M_PI;
+            float a1 = (float)(i + 1) / segments * 2.0f * M_PI;
+            float x0 = cxPx + std::cos(a0) * radiusPx;
+            float y0 = cyPx + std::sin(a0) * radiusPx;
+            float x1 = cxPx + std::cos(a1) * radiusPx;
+            float y1 = cyPx + std::sin(a1) * radiusPx;
+
+            auto [ndcCx, ndcCy] = toNdc(cxPx, cyPx);
+            auto [ndcX0, ndcY0] = toNdc(x0, y0);
+            auto [ndcX1, ndcY1] = toNdc(x1, y1);
+
+            verts.insert(verts.end(), {
+                ndcCx, ndcCy, 0.05f, 0.05f, 0.08f,
+                ndcX0, ndcY0, 0.05f, 0.05f, 0.08f,
+                ndcX1, ndcY1, 0.05f, 0.05f, 0.08f
+            });
+        }
+
+        hudShader.use();
+        glBindVertexArray(vao);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(float), verts.data(), GL_DYNAMIC_DRAW);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5*sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5*sizeof(float), (void*)(2*sizeof(float)));
+        glEnableVertexAttribArray(1);
+        glDrawArrays(GL_TRIANGLES, 0, (int)(verts.size() / 5));
+
+        // Map content clipped to circle
+        glStencilMask(0x00);
+        glStencilFunc(GL_EQUAL, 1, 0xFF);
+        glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+
+        verts.clear();
+
+        float playerCellX = playerPos.x / CELL_SIZE;
+        float playerCellY = playerPos.z / CELL_SIZE;
+        int centerCellX = (int)std::floor(playerCellX);
+        int centerCellY = (int)std::floor(playerCellY);
+
+        for (int dy = -viewRadiusCells; dy <= viewRadiusCells; dy++) {
+            int cy = centerCellY + dy;
+            if (cy < 0 || cy >= maze.getHeight()) continue;
+            for (int dx = -viewRadiusCells; dx <= viewRadiusCells; dx++) {
+                int cx = centerCellX + dx;
+                if (cx < 0 || cx >= maze.getWidth()) continue;
+
+                bool wall = maze.isWall(cx, cy);
+                float intensity = wall ? 0.25f : 0.55f;
+
+                float px = centerPxX + dx * cellPx;
+                float py = centerPxY - dy * cellPx;
+                float half = cellPx * 0.45f;
+                pushQuadPx(verts,
+                           px - half, py - half,
+                           px + half, py + half,
+                           intensity, intensity, intensity + (wall ? 0.0f : 0.1f));
+            }
+        }
+
+        // Exit marker (only if within view)
+        float exitCellX = exitWorldPos.x / CELL_SIZE;
+        float exitCellY = exitWorldPos.z / CELL_SIZE;
+        float exitDx = exitCellX - playerCellX;
+        float exitDy = exitCellY - playerCellY;
+        if (std::abs(exitDx) <= viewRadiusCells + 0.5f &&
+            std::abs(exitDy) <= viewRadiusCells + 0.5f) {
+            float px = centerPxX + exitDx * cellPx;
+            float py = centerPxY - exitDy * cellPx;
+            float half = cellPx * 0.35f;
+            pushQuadPx(verts,
+                       px - half, py - half,
+                       px + half, py + half,
+                       0.9f, 0.6f, 0.1f);
+        }
+
+        if (!verts.empty()) {
+            glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(float), verts.data(), GL_DYNAMIC_DRAW);
+            glDrawArrays(GL_TRIANGLES, 0, (int)(verts.size() / 5));
+        }
+
+        // Player arrow (north-up; yaw rotates arrow only)
+        glm::vec2 dir(std::cos(glm::radians(playerYaw)), -std::sin(glm::radians(playerYaw)));
+        if (glm::length(dir) < 0.0001f) dir = glm::vec2(0.0f, 1.0f);
+        dir = glm::normalize(dir);
+        glm::vec2 perp(-dir.y, dir.x);
+        float arrowLen = 12.0f;
+        float arrowWidth = 6.0f;
+        glm::vec2 tip = dir * arrowLen;
+        glm::vec2 left = -dir * (arrowLen * 0.4f) + perp * arrowWidth;
+        glm::vec2 right = -dir * (arrowLen * 0.4f) - perp * arrowWidth;
+
+        float basePxX = centerPxX;
+        float basePxY = centerPxY;
+
+        auto [ndcTipX, ndcTipY] = toNdc(basePxX + tip.x, basePxY + tip.y);
+        auto [ndcLeftX, ndcLeftY] = toNdc(basePxX + left.x, basePxY + left.y);
+        auto [ndcRightX, ndcRightY] = toNdc(basePxX + right.x, basePxY + right.y);
+
+        float arrowColor[3] = {0.2f, 0.9f, 0.7f};
+        verts = {
+            ndcTipX, ndcTipY, arrowColor[0], arrowColor[1], arrowColor[2],
+            ndcLeftX, ndcLeftY, arrowColor[0], arrowColor[1], arrowColor[2],
+            ndcRightX, ndcRightY, arrowColor[0], arrowColor[1], arrowColor[2],
+        };
+
+        glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(float), verts.data(), GL_DYNAMIC_DRAW);
+        glDrawArrays(GL_TRIANGLES, 0, (int)(verts.size() / 5));
+
+        glStencilMask(0xFF);
+        glDisable(GL_STENCIL_TEST);
+        glEnable(GL_DEPTH_TEST);
+        glBindVertexArray(0);
+    }
 };
 
 // ── Callbacks ──────────────────────────────────────────────────────────────
@@ -717,6 +873,9 @@ int main() {
 
         // HUD text
         {
+            hud.renderMinimap(hudShader, game.maze, game.player.position, game.player.yaw,
+                              game.exitWorldPos, screenWidth, screenHeight);
+
             // Boxes delivered counter
             char buf[64];
             std::snprintf(buf, sizeof(buf), "DELIVERED %d",
