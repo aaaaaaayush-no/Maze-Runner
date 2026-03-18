@@ -56,6 +56,8 @@ private:
     // Maze geometry
     unsigned int mazeVAO, mazeVBO;
     int mazeVertexCount;
+    unsigned int groundVAO, groundVBO;
+    int groundVertexCount;
 
     // Cube geometry (neutral white, used for player model and cauldron parts)
     unsigned int cubeVAO, cubeVBO;
@@ -74,8 +76,9 @@ private:
     int giftBoxVertexCount;
     unsigned int giftBoxTextureID;
 
-    // Wall texture
+    // Wall & ground textures
     unsigned int wallTextureID;
+    unsigned int groundTextureID;
 
     // Graffiti system
     std::vector<unsigned int> graffitiTextureIDs;
@@ -104,6 +107,7 @@ private:
     void buildSphereMesh();
     void buildGiftBoxMesh();
     void generateWallTexture();
+    void generateGroundTexture();
     void generateGiftBoxTexture();
     void generateGraffitiTextures();
     void buildGraffitiMesh(const Maze& maze);
