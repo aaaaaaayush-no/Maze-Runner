@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include "StarRating.h"
+#include "Highscore.h"
 
 // ── Game screen states ─────────────────────────────────────────────────────
 enum class GameScreen {
@@ -28,7 +29,8 @@ public:
                 bool leftPressed, bool rightPressed, bool enterPressed);
 
     void render(int screenWidth, int screenHeight, float time,
-                const std::vector<int>& bestStars);
+                const std::vector<int>& bestStars,
+                const std::vector<HighscoreEntry>& highscores);
 
     Difficulty getSelectedDifficulty() const { return selectedDifficulty; }
     bool shouldQuit() const { return quitSelected; }
@@ -66,6 +68,8 @@ private:
     void drawMenu(std::vector<float>& verts, float time);
     void drawDifficultySelector(std::vector<float>& verts, float time,
                                 const std::vector<int>& bestStars);
+    void drawHighscores(std::vector<float>& verts, float time,
+                        const std::vector<HighscoreEntry>& highscores);
 
     void flush(const std::vector<float>& verts);
 };

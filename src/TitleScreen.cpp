@@ -464,14 +464,73 @@ void TitleScreen::flush(const std::vector<float>& verts) {
     glBindVertexArray(0);
 }
 
+void TitleScreen::drawHighscores(std::vector<float>& verts, float time,
+                                  const std::vector<HighscoreEntry>& highscores) {
+    // Only show highscores on main menu, not in settings
+    if (inSettings) return;
+
+    // Title for highscores section
+    float titlePixel = 0.006f;
+    std::string title = "HIGHSCORES";
+    float titleWidth = getTextWidth(title, titlePixel);
+    float startY = -0.35f;
+    renderBlockText(verts, title, -titleWidth / 2.0f, startY, titlePixel,
+                    1.0f, 0.84f, 0.0f);  // Gold color
+
+    // Display top 5 highscores
+    float entryPixel = 0.0045f;
+    float entryY = startY - 0.08f;
+    float lineSpacing = 0.06f;
+
+    int displayCount = std::min(5, (int)highscores.size());
+    for (int i = 0; i < displayCount; i++) {
+        const auto& entry = highscores[i];
+
+        // Format time as MM:SS
+        int totalSec = (int)entry.time;
+        int mins = totalSec / 60;
+        int secs = totalSec % 60;
+
+        // Create entry string: "#1 - 8 ITEMS - 02:45"
+        char buf[64];
+        std::snprintf(buf, sizeof(buf), "#%d - %d ITEMS - %02d:%02d",
+                      i + 1, entry.collectables, mins, secs);
+        std::string entryText = buf;
+
+        float entryWidth = getTextWidth(entryText, entryPixel);
+        float yPos = entryY - i * lineSpacing;
+
+        // Color based on rank
+        float r, g, b;
+        if (i == 0) {
+            // Gold for 1st place
+            r = 1.0f; g = 0.84f; b = 0.0f;
+        } else if (i == 1) {
+            // Silver for 2nd place
+            r = 0.75f; g = 0.75f; b = 0.75f;
+        } else if (i == 2) {
+            // Bronze for 3rd place
+            r = 0.8f; g = 0.5f; b = 0.2f;
+        } else {
+            // White for others
+            r = 0.7f; g = 0.7f; b = 0.7f;
+        }
+
+        renderBlockText(verts, entryText, -entryWidth / 2.0f, yPos, entryPixel, r, g, b);
+    }
+}
+
+
 void TitleScreen::render(int /*screenWidth*/, int /*screenHeight*/, float time,
-                         const std::vector<int>& bestStars) {
+                         const std::vector<int>& bestStars,
+                         const std::vector<HighscoreEntry>& highscores) {
     std::vector<float> verts;
 
     drawBackground(verts, time);
     drawTitle(verts, time);
     drawMenu(verts, time);
     drawDifficultySelector(verts, time, bestStars);
+    drawHighscores(verts, time, highscores);
 
     // Instructions at bottom
     float instrPixel = 0.004f;
